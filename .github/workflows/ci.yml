@@ -45,7 +45,7 @@ jobs:
       - name: Configure CMake
         run: |
           cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
       
       - name: Build
         run: cmake --build .
