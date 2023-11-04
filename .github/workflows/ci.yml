@@ -13,10 +13,6 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Debug
-
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -40,12 +36,10 @@ jobs:
         run: conan profile detect --force
       
       - name: Install dependencies
-        run: conan install . -s build_type=${{env.BUILD_TYPE}} --build=missing
+        run: conan install . -s build_type=Debug --build=missing
       
       - name: Configure CMake
-        run: |
-          cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=${{env.BUILD_TYPE}}/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        run: cmake --preset conan-debug
       
       - name: Build
-        run: cmake --build .
+        run: cmake --build --preset conan-debug
