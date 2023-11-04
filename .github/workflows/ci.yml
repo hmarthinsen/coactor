@@ -43,7 +43,9 @@ jobs:
         run: conan install . -s build_type=${{env.BUILD_TYPE}} --build=missing
       
       - name: Configure CMake
-        run: cmake . -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        run: |
+          cd build
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
       
       - name: Build
         run: cmake --build .
