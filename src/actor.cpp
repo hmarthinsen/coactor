@@ -1,143 +1,72 @@
-#include <asio.hpp>
-#include <fmt/core.h>
+#include "actor.hpp"
 
-#include <chrono>
-#include <list>
-#include <string>
-#include <utility>
+#include "stage.hpp"
+
+#include <fmt/core.h>
 
 #include <cstdlib>
 
-using namespace std::chrono_literals;
+namespace coactor {
 
-class Actor {
-public:
-	explicit Actor(asio::io_context& io) : m_io{io} { }
+Actor::Actor(Stage& stage, std::function<result<void>(Stage&, Actor&)> fun)
+	: stage{stage}, fun{fun}
+{
+}
 
-	virtual ~Actor() = default;
+Actor::~Actor() { inbox.shutdown(stage).get(); }
 
-	void start() { asio::co_spawn(m_io, process_inbox(), asio::detached); }
+result<int> Actor::receive()
+{
+	const auto tpe = stage.get_executor();
+	return inbox.pop(tpe).run();
+}
 
-	void post_message(std::string message)
-	{
-		m_inbox.push_back(std::move(message));
-	}
+result<void> Actor::send(int i)
+{
+	const auto tpe = stage.get_executor();
+	return inbox.push(tpe, i).run();
+}
 
-private:
-	asio::awaitable<void> process_inbox()
-	{
-		for (auto it = m_inbox.begin(); it != m_inbox.end();) {
-			auto message = *it;
-			bool was_handled = co_await handle_message(std::move(message));
-			if (was_handled) {
-				it = m_inbox.erase(it);
-			} else {
-				it++;
+result<void> Actor::run() { return fun(stage, *this); }
+
+} // namespace coactor
+
+coactor::result<void> run(coactor::Stage& stage)
+{
+	auto consumer = stage.spawn_actor(
+		[](coactor::Stage&, coactor::Actor& actor) -> coactor::result<void> {
+			while (true) {
+				const int number = co_await actor.receive();
+				if (number == -1) {
+					break;
+				}
+
+				fmt::println("{}", number);
 			}
 		}
-	}
+	);
 
-	virtual asio::awaitable<bool> handle_message(std::string message)
-	{
-		co_return true;
-	}
+	auto producer = stage.spawn_actor(
+		[&consumer](coactor::Stage&, coactor::Actor&) -> coactor::result<void> {
+			for (int i = 0; i < 20; i++) {
+				consumer.send(i);
+			}
 
-	asio::io_context& m_io;
-	std::list<std::string> m_inbox;
-};
+			// Signal done:
+			consumer.send(-1);
 
-// class PingPong : public Actor {
-// public:
-// 	explicit PingPong(asio::io_context& io) : Actor(io){};
+			co_return;
+		}
+	);
 
-// private:
-// 	asio::awaitable<bool> handle_message(std::string message) override
-// 	{
-// 		co_await on_ping(std::move(message));
-		
-// 		co_return true;
-// 	}
+	co_await producer.run();
+	co_await consumer.run();
+}
 
-// 	asio::awaitable<void> on_ping(std::string message)
-// 	{
-// 		fmt::println("CSMS received: {}", message);
-
-// 		co_await to_heartbeat_sender.async_write_some(
-// 			asio::buffer("OK"), asio::use_awaitable
-// 		);
-// 	}
-// };
-
-// asio::awaitable<void> send_heartbeats(
-// 	asio::io_context& io,
-// 	asio::readable_pipe& from_csms,
-// 	asio::writable_pipe& to_csms
-// )
-// {
-// 	while (true) {
-// 		asio::steady_timer timer{io, 3s};
-// 		co_await timer.async_wait(asio::use_awaitable);
-
-// 		co_await to_csms.async_write_some(
-// 			asio::buffer("Heartbeat"), asio::use_awaitable
-// 		);
-
-// 		std::array<char, 32> message;
-// 		co_await from_csms.async_read_some(
-// 			asio::buffer(message), asio::use_awaitable
-// 		);
-// 		fmt::println(
-// 			"Heartbeat sender received: {}",
-// 			std::string{begin(message), end(message)}
-// 		);
-// 	}
-// }
-
-// asio::awaitable<void> fake_csms(
-// 	const asio::io_context&,
-// 	asio::readable_pipe& inbox,
-// 	asio::writable_pipe& to_heartbeat_sender
-// )
-// {
-// 	while (true) {
-// 		std::array<char, 32> message;
-// 		co_await inbox.async_read_some(
-// 			asio::buffer(message), asio::use_awaitable
-// 		);
-
-// 		std::string string{begin(message), end(message)};
-
-// 		co_await on_heartbeat(string);
-
-// 		co_await to_heartbeat_sender.async_write_some(
-// 			asio::buffer("OK"), asio::use_awaitable
-// 		);
-// 	}
-// }
-
-// Ping pong example
 int main()
 {
-	asio::io_context io;
-
-	// asio::readable_pipe from_heartbeat_sender(io);
-	// asio::writable_pipe to_csms(io);
-	// asio::connect_pipe(from_heartbeat_sender, to_csms);
-
-	// FakeCsms fake_csms(io, from_heartbeat_sender);
-
-	// asio::readable_pipe from_csms(io);
-	// asio::writable_pipe to_heartbeat_sender(io);
-	// asio::connect_pipe(from_csms, to_heartbeat_sender);
-
-	// asio::co_spawn(
-	// 	io,
-	// 	fake_csms(io, from_heartbeat_sender, to_heartbeat_sender),
-	// 	asio::detached
-	// );
-	// asio::co_spawn(io, send_heartbeats(io, from_csms, to_csms), asio::detached);
-
-	io.run();
+	coactor::Stage stage;
+	run(stage).get();
 
 	return EXIT_SUCCESS;
 }
