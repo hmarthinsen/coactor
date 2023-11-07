@@ -10,18 +10,17 @@ class Stage;
 
 class Actor {
 public:
-	Actor(Stage& stage, std::function<result<void>(Stage&, Actor&)> fun);
+	Actor(Stage& stage, std::function<Result<void>(Stage&, Actor&)> fun);
 	~Actor();
 
-	result<int> receive();
-	result<void> send(int i);
-
-	result<void> run();
+	Result<int> receive();
+	Result<void> send(int i);
+	Result<void> run();
 
 	Stage& stage;
 	ConcurrentQueue inbox;
 
-	std::function<result<void>(Stage&, Actor&)> fun;
+	std::function<Result<void>(Stage&, Actor&)> fun;
 };
 
 } // namespace coactor

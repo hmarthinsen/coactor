@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.22...3.27)
 project(coactor LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -11,11 +11,14 @@ find_package(asio REQUIRED)
 find_package(concurrencpp REQUIRED)
 find_package(fmt REQUIRED)
 
-add_executable(reactive-co src/reactive-co.cpp)
-target_link_libraries(reactive-co asio::asio fmt::fmt)
+add_library(coactor src/actor.cpp src/stage.cpp)
+target_link_libraries(coactor PUBLIC concurrencpp::concurrencpp)
 
-add_executable(actor src/actor.cpp src/stage.cpp)
-target_link_libraries(actor concurrencpp::concurrencpp fmt::fmt)
+add_executable(actortest src/actortest.cpp)
+target_link_libraries(actortest PRIVATE coactor fmt::fmt)
+
+add_executable(reactive-co src/reactive-co.cpp)
+target_link_libraries(reactive-co PRIVATE asio::asio fmt::fmt)
 
 add_executable(ct src/conctest.cpp)
-target_link_libraries(ct concurrencpp::concurrencpp)
+target_link_libraries(ct PRIVATE concurrencpp::concurrencpp)
