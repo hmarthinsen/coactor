@@ -36,7 +36,7 @@ jobs:
         run: conan profile detect --force
 
       - name: Install dependencies
-        run: conan install . -s compiler.cppstd=20 -s compiler.version= -s build_type=Debug --build=missing
+        run: conan install . -s compiler.cppstd=20 -s compiler.version=13 -s build_type=Debug --build=missing
 
       - name: Configure CMake
         run: cmake --preset conan-debug
