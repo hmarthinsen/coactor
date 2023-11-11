@@ -13,9 +13,11 @@ public:
 	Actor(Stage& stage, std::function<Result<void>(Stage&, Actor&)> fun);
 	~Actor();
 
-	Result<int> receive();
-	Result<void> send(int i);
 	Result<void> run();
+	Result<void> send(int i);
+
+	Result<int> receive();
+private:
 
 	Stage& stage;
 	ConcurrentQueue inbox;

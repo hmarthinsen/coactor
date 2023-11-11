@@ -1,6 +1,6 @@
-#include "actor.hpp"
+#include "coactor/actor.hpp"
 
-#include "stage.hpp"
+#include "coactor/stage.hpp"
 
 namespace coactor {
 

@@ -1,7 +1,7 @@
 add_subdirectory(coactor)
 
 add_executable(actortest actortest.cpp)
-target_link_libraries(actortest PRIVATE coactor fmt::fmt)
+target_link_libraries(actortest PRIVATE coactor)
 
 add_executable(reactive-co reactive-co.cpp)
 target_link_libraries(reactive-co PRIVATE asio::asio fmt::fmt)
