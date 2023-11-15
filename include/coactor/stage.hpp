@@ -1,16 +1,14 @@
 #pragma once
 
+#include "actor.hpp"
+
 #include <concurrencpp/concurrencpp.h>
 
-#include <functional>
 #include <map>
 #include <memory>
+#include <utility>
 
 namespace coactor {
-
-template <typename T> using Result = concurrencpp::result<T>;
-
-using ActorId = int;
 
 class Actor;
 
@@ -18,7 +16,22 @@ class Stage {
 public:
 	std::shared_ptr<concurrencpp::thread_pool_executor> get_executor();
 
-	ActorId spawn_actor(std::function<Result<void>(Stage&, Actor&)> fun);
+	template <typename ActorT, typename... Params>
+	ActorId spawn_actor(Params&&... params)
+	{
+		const auto actor_id = m_next_id++;
+
+		m_actors[actor_id]
+			= std::make_unique<ActorT>(*this, std::forward<Params>(params)...);
+
+		const auto executor = get_executor();
+
+		return actor_id;
+	}
+
+	Result<void> send(ActorId recipient, int i);
+
+	Result<void> run();
 
 private:
 	concurrencpp::runtime m_runtime;

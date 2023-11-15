@@ -2,53 +2,56 @@
 
 #include <iostream>
 
-#include <cstdlib>
-
 using namespace coactor;
 
-Result<void> consumer_fun(Actor& consumer)
-{
-	while (true) {
-		const int number = co_await consumer.receive();
-		if (number == -1) {
-			break;
+class Consumer : public Actor {
+public:
+	using Actor::Actor;
+
+private:
+	Result<void> run() override
+	{
+		while (true) {
+			const int number = co_await receive();
+			if (number == -1) {
+				break;
+			}
+
+			std::cout << number << "\n";
 		}
-
-		std::cout << number << "\n";
 	}
-}
+};
 
-// Result<void> producer_fun(Actor& consumer)
-// {
-// 	for (int i = 0; i < 20; i++) {
-// 		consumer.send(i);
-// 	}
-// 	// Signal done:
-// 	consumer.send(-1);
+class Producer : public Actor {
+public:
+	Producer(Stage& stage, ActorId consumer_id)
+		: Actor(stage), m_consumer_id{consumer_id}
+	{
+	}
 
-// 	co_return;
-// }
+private:
+	Result<void> run() override
+	{
+		for (int i = 0; i < 20; i++) {
+			send(m_consumer_id, i);
+		}
+		// Signal done:
+		send(m_consumer_id, -1);
 
-Result<void> run(Stage& stage)
-{
-	ActorId consumer_id
-		= stage.spawn_actor([](Stage&, Actor& actor) -> Result<void> {
-			  return consumer_fun(actor);
-		  });
+		co_return;
+	}
 
-	// auto producer
-	// 	= stage.spawn_actor([&consumer](Stage&, Actor&) -> Result<void> {
-	// 		  return producer_fun(consumer);
-	// 	  });
-
-	// co_await producer.run();
-	// co_await consumer.run();
-}
+	ActorId m_consumer_id;
+};
 
 int main()
 {
 	Stage stage;
-	run(stage).get();
 
-	return EXIT_SUCCESS;
+	auto consumer_id = stage.spawn_actor<Consumer>();
+	stage.spawn_actor<Producer>(consumer_id);
+
+	stage.run().get();
+
+	return 0;
 }

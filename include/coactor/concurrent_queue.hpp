@@ -1,7 +1,5 @@
 #pragma once
 
-#include "stage.hpp"
-
 #include <concurrencpp/concurrencpp.h>
 
 #include <memory>
@@ -10,50 +8,19 @@
 
 namespace coactor {
 
+template <typename T> using Result = concurrencpp::result<T>;
+
+class Stage;
+
 class ConcurrentQueue {
 public:
 	ConcurrentQueue() = default;
 
-	concurrencpp::result<void> shutdown(Stage& stage)
-	{
-		const auto resume_executor = stage.get_executor();
-		{
-			auto guard = co_await m_lock.lock(resume_executor);
-			m_shall_quit = true;
-		}
+	Result<void> shutdown(Stage& stage);
 
-		m_cv.notify_all();
-	}
-
-	concurrencpp::lazy_result<void>
-	push(std::shared_ptr<concurrencpp::executor> resume_executor, int i)
-	{
-		{
-			auto guard = co_await m_lock.lock(resume_executor);
-			m_queue.push(i);
-		}
-
-		m_cv.notify_one();
-	}
-
-	concurrencpp::lazy_result<int>
-	pop(std::shared_ptr<concurrencpp::executor> resume_executor)
-	{
-		auto guard = co_await m_lock.lock(resume_executor);
-		co_await m_cv.await(resume_executor, guard, [this] {
-			return m_shall_quit || !m_queue.empty();
-		});
-
-		if (!m_queue.empty()) {
-			auto result = m_queue.front();
-			m_queue.pop();
-
-			co_return result;
-		}
-
-		assert(m_shall_quit);
-		throw std::runtime_error("queue has been shut down.");
-	}
+	Result<void>
+	push(std::shared_ptr<concurrencpp::executor> resume_executor, int i);
+	Result<int> pop(std::shared_ptr<concurrencpp::executor> resume_executor);
 
 private:
 	concurrencpp::async_lock m_lock;

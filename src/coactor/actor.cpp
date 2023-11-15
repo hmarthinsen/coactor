@@ -4,25 +4,19 @@
 
 namespace coactor {
 
-Actor::Actor(Stage& stage, std::function<Result<void>(Stage&, Actor&)> fun)
-	: stage{stage}, fun{fun}
-{
-}
+Actor::Actor(Stage& stage) : m_stage{stage} { }
 
-Actor::~Actor() { inbox.shutdown(stage).get(); }
+Actor::~Actor() { m_inbox.shutdown(m_stage).get(); }
 
 Result<int> Actor::receive()
 {
-	const auto tpe = stage.get_executor();
-	return inbox.pop(tpe).run();
+	const auto executor = m_stage.get_executor();
+	co_return co_await m_inbox.pop(executor);
 }
 
-Result<void> Actor::send(int i)
+Result<void> Actor::send(ActorId recipient, int i)
 {
-	const auto tpe = stage.get_executor();
-	return inbox.push(tpe, i).run();
+	co_await m_stage.send(recipient, i);
 }
-
-Result<void> Actor::run() { return fun(stage, *this); }
 
 } // namespace coactor

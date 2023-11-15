@@ -2,8 +2,6 @@
 
 #include "coactor/actor.hpp"
 
-#include <utility>
-
 namespace coactor {
 
 std::shared_ptr<concurrencpp::thread_pool_executor> Stage::get_executor()
@@ -11,13 +9,20 @@ std::shared_ptr<concurrencpp::thread_pool_executor> Stage::get_executor()
 	return m_runtime.thread_pool_executor();
 }
 
-ActorId Stage::spawn_actor(std::function<Result<void>(Stage&, Actor&)> fun)
+Result<void> Stage::send(ActorId recipient, int i)
 {
-	auto actor_id = m_next_id++;
-	auto actor = std::make_unique<Actor>(*this, fun);
-	m_actors.emplace(actor_id, std::move(actor));
+	const auto executor = get_executor();
+	co_await m_actors[recipient]->m_inbox.push(executor, i);
+}
 
-	return actor_id;
+Result<void> Stage::run()
+{
+	std::vector<Result<void>> results;
+	for (const auto& [actor_id, actor] : m_actors) {
+		results.push_back(actor->run());
+	}
+
+	co_await concurrencpp::when_all(get_executor(), results.begin(), results.end());
 }
 
 } // namespace coactor

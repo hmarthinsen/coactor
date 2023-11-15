@@ -6,23 +6,26 @@
 
 namespace coactor {
 
+using ActorId = int;
+
 class Stage;
 
 class Actor {
+	friend Stage;
+
 public:
-	Actor(Stage& stage, std::function<Result<void>(Stage&, Actor&)> fun);
+	Actor(Stage& stage);
 	~Actor();
 
-	Result<void> run();
-	Result<void> send(int i);
-
+protected:
+	Result<void> send(ActorId recipient, int i);
 	Result<int> receive();
+
 private:
+	virtual Result<void> run() = 0;
 
-	Stage& stage;
-	ConcurrentQueue inbox;
-
-	std::function<Result<void>(Stage&, Actor&)> fun;
+	Stage& m_stage;
+	ConcurrentQueue m_inbox;
 };
 
 } // namespace coactor
