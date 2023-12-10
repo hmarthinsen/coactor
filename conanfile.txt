@@ -1,7 +1,6 @@
 [requires]
 asio/1.28.2
 concurrencpp/0.1.7
-fmt/10.1.1
 
 [generators]
 CMakeDeps

@@ -12,17 +12,22 @@ std::shared_ptr<concurrencpp::thread_pool_executor> Stage::get_executor()
 Result<void> Stage::send(ActorId recipient, int i)
 {
 	const auto executor = get_executor();
-	co_await m_actors[recipient]->m_inbox.push(executor, i);
+	auto guard = co_await m_stage_lock.lock(executor);
+
+	if (m_actors.contains(recipient)) {
+		const auto executor = get_executor();
+		co_await m_actors[recipient]->m_inbox.push(executor, i);
+	}
 }
 
-Result<void> Stage::run()
+void Stage::wait_until_done()
 {
-	std::vector<Result<void>> results;
-	for (const auto& [actor_id, actor] : m_actors) {
-		results.push_back(actor->run());
-	}
+	const auto executor = get_executor();
+	auto guard = m_stage_lock.lock(executor).run().get();
 
-	co_await concurrencpp::when_all(get_executor(), results.begin(), results.end());
+	m_actors_cv.await(executor, guard, [this] { return m_actors.empty(); })
+		.run()
+		.get();
 }
 
 } // namespace coactor

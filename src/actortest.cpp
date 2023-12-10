@@ -1,5 +1,6 @@
 #include "coactor.hpp"
 
+#include <format>
 #include <iostream>
 
 using namespace coactor;
@@ -8,35 +9,36 @@ class Consumer : public Actor {
 public:
 	using Actor::Actor;
 
-private:
 	Result<void> run() override
 	{
+		int num_producers = 1000;
 		while (true) {
 			const int number = co_await receive();
 			if (number == -1) {
-				break;
-			}
+				num_producers--;
 
-			std::cout << number << "\n";
+				if (num_producers == 0) {
+					break;
+				}
+			}
 		}
 	}
 };
 
 class Producer : public Actor {
 public:
-	Producer(Stage& stage, ActorId consumer_id)
-		: Actor(stage), m_consumer_id{consumer_id}
+	Producer(Stage& stage, ActorId id, ActorId consumer_id)
+		: Actor(stage, id), m_consumer_id{consumer_id}
 	{
 	}
 
-private:
 	Result<void> run() override
 	{
-		for (int i = 0; i < 20; i++) {
-			send(m_consumer_id, i);
+		for (int i = 0; i < 1000; i++) {
+			co_await send(m_consumer_id, i);
 		}
 		// Signal done:
-		send(m_consumer_id, -1);
+		co_await send(m_consumer_id, -1);
 
 		co_return;
 	}
@@ -49,9 +51,10 @@ int main()
 	Stage stage;
 
 	auto consumer_id = stage.spawn_actor<Consumer>();
-	stage.spawn_actor<Producer>(consumer_id);
+	for (int i = 0; i < 1000; i++) {
+		stage.spawn_actor<Producer>(consumer_id);
+	}
 
-	stage.run().get();
-
+	stage.wait_until_done();
 	return 0;
 }

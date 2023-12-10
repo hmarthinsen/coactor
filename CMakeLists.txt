@@ -9,6 +9,5 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 find_package(asio REQUIRED)
 find_package(concurrencpp REQUIRED)
-find_package(fmt REQUIRED)
 
 add_subdirectory(src)

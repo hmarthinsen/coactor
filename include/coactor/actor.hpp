@@ -14,18 +14,21 @@ class Actor {
 	friend Stage;
 
 public:
-	Actor(Stage& stage);
+	Actor(Stage& stage, ActorId id);
 	~Actor();
+
+	virtual Result<void> run() = 0;
+	ActorId get_actor_id();
 
 protected:
 	Result<void> send(ActorId recipient, int i);
 	Result<int> receive();
 
 private:
-	virtual Result<void> run() = 0;
-
-	Stage& m_stage;
 	ConcurrentQueue m_inbox;
+	bool m_is_done = false;
+	Stage& m_stage;
+	ActorId m_id;
 };
 
 } // namespace coactor

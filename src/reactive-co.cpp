@@ -1,9 +1,10 @@
 #include <asio.hpp>
-#include <fmt/core.h>
 
 #include <array>
 #include <chrono>
 #include <exception>
+#include <format>
+#include <iostream>
 #include <string>
 
 #include <cstdlib>
@@ -28,8 +29,8 @@ asio::awaitable<void> send_heartbeats(
 		co_await from_csms.async_read_some(
 			asio::buffer(message), asio::use_awaitable
 		);
-		fmt::println(
-			"Heartbeat sender received: {}",
+		std::cout << std::format(
+			"Heartbeat sender received: {}\n",
 			std::string{begin(message), end(message)}
 		);
 	}
@@ -46,8 +47,8 @@ asio::awaitable<void> fake_csms(
 		co_await from_heartbeat_sender.async_read_some(
 			asio::buffer(message), asio::use_awaitable
 		);
-		fmt::println(
-			"CSMS received: {}", std::string{begin(message), end(message)}
+		std::cout << std::format(
+			"CSMS received: {}\n", std::string{begin(message), end(message)}
 		);
 
 		co_await to_heartbeat_sender.async_write_some(
@@ -81,7 +82,7 @@ int main()
 
 		io.run();
 	} catch (std::exception& e) {
-		fmt::println(stderr, "{}", e.what());
+		std::cerr << e.what() << '\n';
 		return EXIT_FAILURE;
 	}
 

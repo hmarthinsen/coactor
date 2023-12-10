@@ -1,6 +1,7 @@
 # Custom
 build/*
 CMakeUserPresets.json
+docs/dont-commit/*
 
 # Created by https://www.toptal.com/developers/gitignore/api/c++,cmake,visualstudiocode,conan
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,cmake,visualstudiocode,conan
