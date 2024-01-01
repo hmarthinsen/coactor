@@ -1,6 +1,7 @@
 [requires]
 asio/1.28.2
 concurrencpp/0.1.7
+nlohmann_json/3.11.3
 
 [generators]
 CMakeDeps

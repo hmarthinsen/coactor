@@ -1,8 +1,7 @@
 #pragma once
 
-#include "concurrent_queue.hpp"
-
-#include <functional>
+#include "coactor/concurrent_queue.hpp"
+#include "coactor/message.hpp"
 
 namespace coactor {
 
@@ -21,8 +20,8 @@ public:
 	ActorId get_actor_id();
 
 protected:
-	Result<void> send(ActorId recipient, int i);
-	Result<int> receive();
+	Result<void> send(ActorId recipient, const Message& message);
+	Result<Message> receive();
 
 private:
 	ConcurrentQueue m_inbox;

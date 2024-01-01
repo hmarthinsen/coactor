@@ -1,12 +1,12 @@
 #pragma once
 
-#include "actor.hpp"
+#include "coactor/actor.hpp"
+#include "coactor/message.hpp"
 
 #include <concurrencpp/concurrencpp.h>
 
 #include <map>
 #include <memory>
-#include <utility>
 
 namespace coactor {
 
@@ -59,7 +59,7 @@ public:
 		return actor_id;
 	}
 
-	Result<void> send(ActorId recipient, int i);
+	Result<void> send(ActorId recipient, const Message& message);
 
 	void wait_until_done();
 

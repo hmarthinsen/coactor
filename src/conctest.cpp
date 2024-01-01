@@ -1,7 +1,10 @@
 #include <concurrencpp/concurrencpp.h>
 
+#include <exception>
 #include <iostream>
+#include <memory>
 #include <queue>
+#include <stdexcept>
 
 using namespace concurrencpp;
 

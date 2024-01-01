@@ -2,6 +2,9 @@
 
 #include "coactor/actor.hpp"
 
+#include <format>
+#include <iostream>
+
 namespace coactor {
 
 std::shared_ptr<concurrencpp::thread_pool_executor> Stage::get_executor()
@@ -9,14 +12,27 @@ std::shared_ptr<concurrencpp::thread_pool_executor> Stage::get_executor()
 	return m_runtime.thread_pool_executor();
 }
 
-Result<void> Stage::send(ActorId recipient, int i)
+Result<void> Stage::send(ActorId recipient, const Message& message)
 {
 	const auto executor = get_executor();
 	auto guard = co_await m_stage_lock.lock(executor);
 
 	if (m_actors.contains(recipient)) {
 		const auto executor = get_executor();
-		co_await m_actors[recipient]->m_inbox.push(executor, i);
+		std::cout << "stage: sending to recipient " << recipient << " data: ";
+
+		for (int d : Message::to_msgpack(message)) {
+			std::cout << std::hex << std::setfill('0') << std::setw(2) << d
+					  << " ";
+		}
+
+		std::cout << std::endl;
+
+		co_await m_actors[recipient]->m_inbox.push(
+			executor, Message::to_msgpack(message)
+		);
+		std::cout << "stage: sending to recipient " << recipient << " done"
+				  << std::endl;
 	}
 }
 

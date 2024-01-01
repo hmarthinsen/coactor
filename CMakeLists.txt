@@ -9,5 +9,6 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 find_package(asio REQUIRED)
 find_package(concurrencpp REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 add_subdirectory(src)
