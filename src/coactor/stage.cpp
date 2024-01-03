@@ -4,6 +4,7 @@
 
 #include <format>
 #include <iostream>
+#include <syncstream>
 
 namespace coactor {
 
@@ -19,20 +20,25 @@ Result<void> Stage::send(ActorId recipient, const Message& message)
 
 	if (m_actors.contains(recipient)) {
 		const auto executor = get_executor();
-		std::cout << "stage: sending to recipient " << recipient << " data: ";
 
-		for (int d : Message::to_msgpack(message)) {
-			std::cout << std::hex << std::setfill('0') << std::setw(2) << d
-					  << " ";
+		{
+			std::osyncstream sync_out(std::cout);
+			sync_out << "stage: sending to recipient " << recipient
+					 << " data: ";
+
+			for (int d : Message::to_msgpack(message)) {
+				sync_out << std::hex << std::setfill('0') << std::setw(2) << d
+						 << " ";
+			}
+
+			sync_out << std::endl;
 		}
-
-		std::cout << std::endl;
 
 		co_await m_actors[recipient]->m_inbox.push(
 			executor, Message::to_msgpack(message)
 		);
-		std::cout << "stage: sending to recipient " << recipient << " done"
-				  << std::endl;
+		std::osyncstream(std::cout) << "stage: sending to recipient "
+									<< recipient << " done" << std::endl;
 	}
 }
 

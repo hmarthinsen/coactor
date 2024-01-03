@@ -3,6 +3,7 @@ BasedOnStyle: WebKit
 Language: Cpp
 AlignAfterOpenBracket: BlockIndent
 AlignArrayOfStructures: Right
+AlignOperands: DontAlign
 BinPackArguments: false
 BinPackParameters: false
 ColumnLimit: 80

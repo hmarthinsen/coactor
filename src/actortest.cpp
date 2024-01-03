@@ -1,6 +1,7 @@
 #include "coactor.hpp"
 
 #include <iostream>
+#include <syncstream>
 #include <vector>
 
 #include <cstddef>
@@ -15,9 +16,11 @@ public:
 	{
 		int num_producers = 2;
 		while (true) {
-			std::cout << get_actor_id() << ": receiving" << std::endl;
+			std::osyncstream(std::cout)
+				<< get_actor_id() << ": receiving" << std::endl;
 			const std::vector<int> array = co_await receive();
-			std::cout << get_actor_id() << ": received data" << std::endl;
+			std::osyncstream(std::cout)
+				<< get_actor_id() << ": received data" << std::endl;
 
 			long long sum = 0;
 			for (std::size_t i = 0; i < array.size(); i++) {
@@ -27,7 +30,9 @@ public:
 			if (array.size() == 1) {
 				num_producers--;
 
-				std::cout << "Producers left: " << num_producers << std::endl;
+				std::osyncstream(std::cout)
+					<< get_actor_id() << ": producers left: " << num_producers
+					<< std::endl;
 
 				if (num_producers == 0) {
 					break;
@@ -53,11 +58,13 @@ public:
 		Message msg = data;
 
 		for (int i = 0; i < 3; i++) {
-			std::cout << get_actor_id() << ": sending " << i << std::endl;
+			std::osyncstream(std::cout)
+				<< get_actor_id() << ": sending " << i << std::endl;
 			co_await send(m_consumer_id, msg);
 		}
 		// Signal done:
-		std::cout << get_actor_id() << ": sending done" << std::endl;
+		std::osyncstream(std::cout)
+			<< get_actor_id() << ": sending done" << std::endl;
 		Message msg2 = std::vector<int>{-1};
 		co_await send(m_consumer_id, msg2);
 
