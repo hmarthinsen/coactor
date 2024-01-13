@@ -25,6 +25,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
 
+      - name: Select gcc/g++ 13
+        run: |
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 10
+
       - name: Install Conan
         id: conan
         uses: turtlebrowser/get-conan@main
