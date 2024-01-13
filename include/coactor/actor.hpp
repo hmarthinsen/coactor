@@ -1,33 +1,40 @@
 #pragma once
 
-#include "coactor/concurrent_queue.hpp"
-#include "coactor/message.hpp"
+// #include "coactor/inbox.hpp"
+// #include "coactor/stage.hpp"
+#include "coactor/result.hpp"
+
+#include <functional>
 
 namespace coactor {
 
-using ActorId = int;
-
 class Stage;
+class Inbox;
 
-class Actor {
-	friend Stage;
+using ActorId = int;
+using Actor = std::function<Result<void>(Stage&, ActorId, Inbox&)>;
 
-public:
-	Actor(Stage& stage, ActorId id);
-	~Actor();
+// class Stage;
 
-	virtual Result<void> run() = 0;
-	ActorId get_actor_id();
+// class Actor {
+// 	friend Stage;
 
-protected:
-	Result<void> send(ActorId recipient, const Message& message);
-	Result<Message> receive();
+// public:
+// 	Actor(Stage& stage, ActorId id);
+// 	~Actor();
 
-private:
-	ConcurrentQueue m_inbox;
-	bool m_is_done = false;
-	Stage& m_stage;
-	ActorId m_id;
-};
+// 	virtual Result<void> run() = 0;
+// 	ActorId get_actor_id();
+
+// protected:
+// 	Result<void> send(ActorId recipient, const Message& message);
+// 	Result<Message> receive();
+
+// private:
+// 	ConcurrentQueue m_inbox;
+// 	bool m_is_done = false;
+// 	Stage& m_stage;
+// 	ActorId m_id;
+// };
 
 } // namespace coactor

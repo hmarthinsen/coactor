@@ -1,5 +1,7 @@
 #pragma once
 
+#include "coactor/result.hpp"
+
 #include <concurrencpp/concurrencpp.h>
 
 #include <memory>
@@ -9,8 +11,6 @@
 #include <cstddef>
 
 namespace coactor {
-
-template <typename T> using Result = concurrencpp::result<T>;
 
 class Stage;
 

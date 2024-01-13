@@ -2,6 +2,7 @@
 
 #include "coactor/actor.hpp"
 #include "coactor/message.hpp"
+#include "coactor/result.hpp"
 
 #include <concurrencpp/concurrencpp.h>
 
@@ -10,67 +11,39 @@
 
 namespace coactor {
 
-template <typename ActorT>
+class Inbox;
+
 Result<void> run_actor(
 	concurrencpp::executor_tag,
 	std::shared_ptr<concurrencpp::thread_pool_executor> executor,
+	Stage& stage,
 	ActorId actor_id,
-	std::shared_ptr<ActorT> actor,
-	std::map<ActorId, std::shared_ptr<Actor>>& actors,
+	Actor actor,
+	std::map<ActorId, std::shared_ptr<Inbox>>& inboxes,
 	concurrencpp::async_lock& stage_lock,
-	concurrencpp::async_condition_variable& actors_cv
-)
-{
-	co_await actor->run();
-
-	{
-		auto guard = co_await stage_lock.lock(executor);
-		actors.erase(actor_id);
-	}
-
-	actors_cv.notify_one();
-}
-
-class Actor;
+	concurrencpp::async_condition_variable& inboxes_cv
+);
 
 class Stage {
 public:
 	std::shared_ptr<concurrencpp::thread_pool_executor> get_executor();
 
-	template <typename ActorT, typename... Params>
-	ActorId spawn_actor(Params&&... params)
-	{
-		const auto executor = get_executor();
-
-		ActorId actor_id;
-		std::shared_ptr<ActorT> actor;
-		{
-			auto guard = m_stage_lock.lock(executor).run().get();
-
-			actor_id = m_next_id++;
-			actor = std::make_shared<ActorT>(*this, actor_id, params...);
-			m_actors[actor_id] = actor;
-		}
-
-		run_actor(
-			{}, executor, actor_id, actor, m_actors, m_stage_lock, m_actors_cv
-		);
-
-		return actor_id;
-	}
+	ActorId spawn_actor(Actor actor);
 
 	Result<void> send(ActorId recipient, const Message& message);
 
 	void wait_until_done();
+
+	Result<void> sleep(std::chrono::milliseconds duration);
 
 private:
 	concurrencpp::runtime m_runtime;
 
 	ActorId m_next_id = 0;
 
-	std::map<ActorId, std::shared_ptr<Actor>> m_actors;
+	std::map<ActorId, std::shared_ptr<Inbox>> m_inboxes;
 	concurrencpp::async_lock m_stage_lock;
-	concurrencpp::async_condition_variable m_actors_cv;
+	concurrencpp::async_condition_variable m_inboxes_cv;
 };
 
 } // namespace coactor

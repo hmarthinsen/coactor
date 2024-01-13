@@ -1,4 +1,5 @@
 add_subdirectory(coactor)
+add_subdirectory(experiments)
 
 add_executable(actortest actortest.cpp)
 target_link_libraries(actortest PRIVATE coactor)
