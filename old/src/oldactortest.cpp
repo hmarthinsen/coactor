@@ -58,7 +58,7 @@ private:
 
 class MessagePrinter : public Actor {
 public:
-	explicit MessagePrinter(asio::io_context& io) : Actor(io){};
+	explicit MessagePrinter(asio::io_context& io) : Actor(io) { }
 
 private:
 	asio::awaitable<void> run()

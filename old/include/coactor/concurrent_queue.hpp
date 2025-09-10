@@ -17,7 +17,9 @@ class Stage;
 class ConcurrentQueue {
 public:
 	ConcurrentQueue(std::size_t max_queue_size = 1000)
-		: m_max_queue_size{max_queue_size} {};
+		: m_max_queue_size{max_queue_size}
+	{
+	}
 
 	Result<void> shutdown(Stage& stage);
 

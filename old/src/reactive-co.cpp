@@ -21,12 +21,14 @@ asio::awaitable<void> send_heartbeats(
 		co_await timer.async_wait(asio::use_awaitable);
 
 		co_await to_csms.async_write_some(
-			asio::buffer("Heartbeat"), asio::use_awaitable
+			asio::buffer("Heartbeat"),
+			asio::use_awaitable
 		);
 
 		std::array<char, 32> message;
 		co_await from_csms.async_read_some(
-			asio::buffer(message), asio::use_awaitable
+			asio::buffer(message),
+			asio::use_awaitable
 		);
 		std::cout << std::format(
 			"Heartbeat sender received: {}\n",
@@ -44,14 +46,17 @@ asio::awaitable<void> fake_csms(
 	while (true) {
 		std::array<char, 32> message;
 		co_await from_heartbeat_sender.async_read_some(
-			asio::buffer(message), asio::use_awaitable
+			asio::buffer(message),
+			asio::use_awaitable
 		);
 		std::cout << std::format(
-			"CSMS received: {}\n", std::string{begin(message), end(message)}
+			"CSMS received: {}\n",
+			std::string{begin(message), end(message)}
 		);
 
 		co_await to_heartbeat_sender.async_write_some(
-			asio::buffer("OK"), asio::use_awaitable
+			asio::buffer("OK"),
+			asio::use_awaitable
 		);
 	}
 }
@@ -76,7 +81,9 @@ int main()
 			asio::detached
 		);
 		asio::co_spawn(
-			io, send_heartbeats(io, from_csms, to_csms), asio::detached
+			io,
+			send_heartbeats(io, from_csms, to_csms),
+			asio::detached
 		);
 
 		io.run();

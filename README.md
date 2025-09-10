@@ -2,46 +2,155 @@
 
 C++20 actor framework using coroutines.
 
+## Requirements
+
+- Actor system inspired by Erlang, but using C++20 coroutines.
+- There is an underlying runtime that enables the actor system.
+- An actor can spawn other actors (called children).
+- An actor should know its own address and its children's addresses.
+- The scheduling is cooperative multitasking.
+- There is one scheduler per thread.
+- The system will start with a certain number of schedulers (parameter?).
+- There is no limit to how many actors may be assigned to a scheduler.
+- Actor state is isolated from other actors.
+- Need to have timeout functionality when waiting for messages.
+- When running in inspection mode, we need:
+  - Be able to halt execution (by blocking messages? What about timeouts?).
+  - Visualize actors and messages.
+  - Inspect message queues.
+  - Slow down execution. How?
+
 ## Design
+
+```plantuml
+@startuml
+
+Runtime *-- Scheduler
+Scheduler *-- Actor
+Actor --> Address
+Actor --> MessageQueue
+MessageQueue *-- Message
+
+@enduml
+```
 
 ### Actors
 
-- An **actor** has an **inbox** that contains a list of **messages**.
+- An **actor** has a **message queue** that contains **messages**.
 - An actor has a unique **address**.
+  The address does *not* depend on which scheduler it is running on, which means that an actor can change scheduler without changing address.
 - An actor can send messages to actors that it has the address to.
-- Actors have **state**, i.e. stored data.
-- Actors are isolated, in the sense that they can not access the data stored in other actors.
-- Actors process the messages in the inbox in the same order as they were received.
+- Actors have private **state**.
+- Actors are isolated, in the sense that they can not access the state of other actors.
+- Actors process the messages in the message queue in the same order as they were received.
 - When a message is processed, the message and the actor state decides what the actor does.
 - Actors can spawn new actors.
+
+#### Actor addresses
+
+TODO
+
+#### Sending messages
+
+TODO
+
+#### Receiving messages
+
+TODO
+
+#### Spawning actors
+
+TODO
+
+#### Messages
+
+A message can contain: TODO
+
+#### Processing messages
+
+TODO
+
+### Scheduling
+
+A **scheduler** organizes the execution of actors in a single thread.
+
+### Runtime
+
+A single **runtime** is constructed in the OS process, and the runtime organizes the schedulers.
+
+### Inspector
+
+The inspector is itself written using Coactor.
+This means that all the information that the inspector can see must be accessible to any Coactor program.
+
+## Implementation
 
 ### Coroutines
 
 A **coroutine** is a function that can be suspended, and then resumed later.
 A suspended coroutine saves its local variables, and restores them when it is resumed.
 
+The implementation relies on coroutines as the basic async building block.
 We can implement actors using coroutines by creating a mechanism for receiving and sending messages between coroutines.
 
-### Actor addresses
+### Actor implementation
 
-TODO
+Actors are implemented as coroutines.
+The actor state consists of local variables in the coroutine.
 
-### Sending messages
+The actor address is the address of the coroutine.
+See [`std::coroutine_handle<Promise>::address()`](https://en.cppreference.com/w/cpp/coroutine/coroutine_handle/address.html).
+NB: This will only work when we are only considering actors on a single machine.
 
-TODO
+An actor has a **status**, which can be **ready**, **running**, **blocked**, or **done**.
 
-### Receiving messages
+An actor has two layers: the **system layer** and the **user layer**.
+The system layer takes care of all the background details and is defined by Coactor itself, but the user layer is defined by the programmer.
 
-TODO
+### Messages and system messages
 
-### Spawning actors
+Actors can send messages to each other.
+These (ordinary) messages are actually just one type of **system messages** (called signals in Erlang), which are used for managing the actors.
+E.g. there is a system message for requesting information about the actor, like the contents of its message queue, or the actor status.
+The programmer does *not* write the code for reacting to system messages, only ordinary messages.
 
-TODO
+All the incoming system messages (including ordinary messages) for an actor go into the same message queue.
 
-### Messages
+### Scheduler implementation
 
-A message can contain: TODO
+The schedulers should work similarly to the BEAM scheduler loop, as described in [The BEAM Book](https://blog.stenmans.org/theBeamBook/#_the_scheduler_loop).
 
-### Processing messages
+When an actor waits for a message, its coroutine is suspended and control passes to its scheduler.
+The scheduler then chooses which actor to pass control to.
 
-TODO
+#### Scheduler finite state machine
+
+The actor statuses determine what the scheduler does.
+
+When the actor is running (status *running*), the following can cause control to pass back to the scheduler:
+
+- The actor tries to receive a message.
+  - If there is a message in the message queue, execution continues in the actor.
+  - If there are no messages in the message queue, the status becomes *blocked*, the actor coroutine is suspended and control passes to the scheduler.
+
+When actor A sends a message to actor B, the following will happen:
+
+- If actor B has status *done*, nothing happens.
+- If actor B has status *ready* or *running*, the message is placed in B's message queue.
+- If actor B has status *blocked*, the message is placed in B's message queue and B's status becomes *ready*.
+
+### Inspector implementation
+
+The inspector relies on using special system messages to request the information it needs.
+The main system messages it needs are **actor_info_request** and **actor_info_reply**.
+
+The inspector sends **actor_info_request** to another actor.
+The actor will schedule processing the request.
+The processing ends with replying to the inspector with **actor_info_reply** together with the info.
+
+### Multiple schedulers
+
+If we have two actors in different schedulers that want to send messages to each other, we need some sort of mechanism for avoiding message queue collision.
+
+- The simplest solution is to protect each queue with a mutex, blocking access from multiple threads simultaneously.
+- Another solution is to have some sort of lock-free multiple producer, single consumer (MPSC) queue.

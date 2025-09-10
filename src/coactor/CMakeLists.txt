@@ -1,4 +1,12 @@
-add_library(coactor stage.cpp concurrent_queue.cpp message.cpp inbox.cpp)
-target_link_libraries(coactor PUBLIC concurrencpp::concurrencpp
-                                     nlohmann_json::nlohmann_json)
-target_include_directories(coactor PUBLIC ${CMAKE_SOURCE_DIR}/include)
+add_library(coactor)
+target_sources(
+    coactor
+    PUBLIC
+        FILE_SET HEADERS
+            BASE_DIRS ${PROJECT_SOURCE_DIR}/include
+            FILES
+                ${PROJECT_SOURCE_DIR}/include/coactor/actor.hpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/coactor.hpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/scheduler.hpp
+    PRIVATE actor.cpp scheduler.cpp
+)

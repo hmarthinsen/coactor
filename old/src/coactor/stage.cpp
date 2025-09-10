@@ -83,7 +83,8 @@ Result<void> Stage::send(ActorId recipient, const Message& message)
 		}
 
 		co_await m_inboxes[recipient]->m_queue.push(
-			executor, Message::to_msgpack(message)
+			executor,
+			Message::to_msgpack(message)
 		);
 		std::osyncstream(std::cout) << "stage: sending to recipient "
 									<< recipient << " done" << std::endl;

@@ -4,6 +4,7 @@
 
 namespace coactor {
 
-template <typename T> using Result = concurrencpp::result<T>;
+template <typename T>
+using Result = concurrencpp::result<T>;
 
 } // namespace coactor

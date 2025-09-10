@@ -96,7 +96,11 @@ int main()
 
 	for (int i = 0; i < 4; i++) {
 		producers[i] = producer_loop(
-			{}, thread_pool_executor, queue, i * 5, (i + 1) * 5
+			{},
+			thread_pool_executor,
+			queue,
+			i * 5,
+			(i + 1) * 5
 		);
 	}
 

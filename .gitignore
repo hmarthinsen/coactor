@@ -1,7 +1,9 @@
 # Custom
-build/*
+build/
 CMakeUserPresets.json
-docs/dont-commit/*
+docs/dont-commit/
+.cache/
+.idea/
 
 # Created by https://www.toptal.com/developers/gitignore/api/c++,cmake,visualstudiocode,conan
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,cmake,visualstudiocode,conan
@@ -80,12 +82,7 @@ environment_run.ps1.env
 environment_run.sh.env
 
 ### VisualStudioCode ###
-.vscode/*
-# !.vscode/settings.json
-# !.vscode/tasks.json
-# !.vscode/launch.json
-# !.vscode/extensions.json
-# !.vscode/*.code-snippets
+.vscode/
 
 # Local History for Visual Studio Code
 .history/

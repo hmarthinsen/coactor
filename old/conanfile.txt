@@ -1,3 +1,5 @@
+[requires]
+
 [generators]
 CMakeDeps
 CMakeToolchain

@@ -4,34 +4,71 @@ Language: Cpp
 AlignAfterOpenBracket: BlockIndent
 AlignArrayOfStructures: Right
 AlignOperands: DontAlign
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AlwaysBreakBeforeMultilineStrings: true
 BinPackArguments: false
 BinPackParameters: false
+BreakStringLiterals: false
+BreakTemplateDeclarations: Yes
 ColumnLimit: 80
 Cpp11BracedListStyle: true
 FixNamespaceComments: true
 IncludeBlocks: Regroup
-IncludeCategories:
-  # C headers
-  - Regex: '^(<|")c(assert|ctype|errno|float|limits|locale|math|setjmp|signal|stdarg|stddef|stdio|stdlib|string|time|wchar|wctype|iso646|fenv|inttypes|stdint|uchar|complex|stdalign|stdbool|tgmath|stdatomic)(>|")'
+IncludeCategories: # Tries to implement this: https://stackoverflow.com/a/14243688
+  # Standard C headers - All headers at https://en.cppreference.com/w/c/header.html
+  - Regex: '^(<|")(assert|complex|ctype|errno|fenv|float|inttypes|iso646|limits|locale|math|setjmp|signal|stdalign|stdarg|stdatomic|stdbit|stdbool|stdckdint|stddef|stdint|stdio|stdlib|stdmchar|stdnoreturn|string|tgmath|threads|time|uchar|wchar|wctype)\.h(>|")'
+    CaseSensitive: true
     Priority: 5
-  - Regex: '^(<|")(assert|ctype|errno|float|limits|locale|math|setjmp|signal|stdarg|stddef|stdio|stdlib|string|time|wchar|wctype|iso646|fenv|inttypes|stdint|uchar|complex|stdalign|stdbool|tgmath|stdatomic).h(>|")'
+  # Standard C headers - C++ headers for C library facilities at https://en.cppreference.com/w/cpp/standard_library.html
+  - Regex: '^(<|")c(assert|complex|ctype|errno|fenv|float|inttypes|iso646|limits|locale|math|setjmp|signal|stdalign|stdarg|stdbool|stddef|stdint|stdio|stdlib|string|tgmath|time|uchar|wchar|wctype)(>|")'
+    CaseSensitive: true
     Priority: 5
-  # C++ headers (without extension).
-  - Regex: '^<([A-Za-z0-9\Q/-_\E])+>'
+  # glibc C headers - .h files in /usr/include/ from Zypper package glibc-devel
+  - Regex: '^(<|")(a\.out|aio|aliases|alloca|ar|argp|argz|assert|byteswap|complex|cpio|ctype|dirent|dlfcn|elf|endian|envz|err|errno|error|execinfo|fcntl|features-time64|features|fenv|fmtmsg|fnmatch|fpu_control|fstab|fts|ftw|gconv|getopt|glob|gnu-versions|grp|gshadow|iconv|ieee754|ifaddrs|inttypes|langinfo|lastlog|libgen|libintl|limits|link|locale|malloc|math|mcheck|memory|mntent|monetary|mqueue|netdb|nl_types|nss|obstack|paths|poll|printf|proc_service|pthread|pty|pwd|re_comp|regex|regexp|resolv|sched|search|semaphore|setjmp|sgtty|shadow|signal|spawn|stab|stdc-predef|stdint|stdio|stdio_ext|stdlib|string|strings|syscall|sysexits|syslog|tar|termio|termios|tgmath|thread_db|threads|time|ttyent|uchar|ucontext|ulimit|unistd|utime|utmp|utmpx|values|wait|wchar|wctype|wordexp)\.h(>|")'
+    CaseSensitive: true
+    Priority: 5
+  # glibc C headers - Subdirs with .h files in /usr/include/ from Zypper package glibc-devel
+  - Regex: '^(<|")(arpa|bits|finclude|gnu|net|netash|netatalk|netax25|neteconet|netinet|netipx|netiucv|netpacket|netrom|netrose|nfs|protocols|rpc|scsi|sys)/.*\.h(>|")'
+    CaseSensitive: true
+    Priority: 5
+  # Linux kernel C headers - Subdirs with .h files in /usr/include/ from Zypper package linux-glibc-devel
+  - Regex: '^(<|")(asm|asm-generic|linux|misc|mtd|rdma|scsi|sound|video|xen)/.*\.h(>|")'
+    CaseSensitive: true
+    Priority: 5
+  # Standard C++ headers - C++ library headers at https://en.cppreference.com/w/cpp/standard_library.html
+  - Regex: '^(<|")(algorithm|any|array|atomic|barrier|bit|bitset|charconv|chrono|codecvt|compare|complex|concepts|condition_variable|contracts|coroutine|debugging|deque|exception|execution|expected|filesystem|flat_map|flat_set|format|forward_list|fstream|functional|future|generator|hazard_pointer|hive|initializer_list|inplace_vector|iomanip|ios|iosfwd|iostream|istream|iterator|latch|limits|linalg|list|locale|map|mdspan|memory_resource|memory|mutex|new|numbers|numeric|optional|ostream|print|queue|random|ranges|ratio|rcu|regex|scoped_allocator|semaphore|set|shared_mutex|simd|source_location|span|spanstream|sstream|stack|stacktrace|stdexcept|stdfloat|stop_token|streambuf|string_view|string|strstream|syncstream|system_error|text_encoding|thread|tuple|type_traits|typeindex|typeinfo|unordered_map|unordered_set|utility|valarray|variant|vector|version)(>|")'
+    CaseSensitive: true
     Priority: 4
-  # Headers from almost-standard libraries.
-  - Regex: '^(<|")(boost|gtest|gmock).*(>|")'
+  # Headers from almost-standard libraries, including all starting with "Q", assumed to be from Qt.
+  - Regex: '^(<|")(boost/|gtest|gmock|Q).*(>|")'
+    CaseSensitive: true
     Priority: 3
-  # Headers in <> with extension.
-  - Regex: '<([A-Za-z0-9.\Q/-_\E])+>'
+  # Headers in <>. Assumed to be system headers.
+  - Regex: "^<[A-Za-z0-9./_+-]+>"
+    CaseSensitive: true
     Priority: 2
-  # Headers in "" with extension.
-  - Regex: '"([A-Za-z0-9.\Q/-_\E])+"'
+  # Headers in "". Assumed to be project headers.
+  - Regex: '^"[A-Za-z0-9./_+-]+"'
+    CaseSensitive: true
     Priority: 1
 IndentPPDirectives: AfterHash
 InsertBraces: true
-KeepEmptyLinesAtTheStartOfBlocks: false
+KeepEmptyLines:
+  AtEndOfFile: false
+  AtStartOfBlock: false
+  AtStartOfFile: false
+LambdaBodyIndentation: Signature
+LineEnding: LF
+MacroBlockBegin: '^.*_BEGIN'
+MacroBlockEnd: '^.*_END'
+NamespaceIndentation: None
 PackConstructorInitializers: NextLine
+QualifierAlignment: Left
+RemoveParentheses: ReturnStatement
+RemoveSemicolon: true
 SeparateDefinitionBlocks: Always
 SpaceBeforeCpp11BracedList: false
 SpacesInContainerLiterals: false
