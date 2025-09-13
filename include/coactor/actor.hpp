@@ -1,20 +1,18 @@
 #pragma once
 
-#include "scheduler.hpp"
+#include "coactor/detail/utils.hpp"
 
 #include <coroutine>
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace coactor {
 
 namespace detail {
-
-struct Envelope {
-	ActorId receiver;
-	std::string msg;
-};
 
 class ReceiveAwaiter {
 public:
@@ -67,41 +65,39 @@ public:
 		Done
 	};
 
-	using Handle = std::coroutine_handle<detail::Promise>;
+	using Coroutine = std::coroutine_handle<detail::Promise>;
 	virtual ~Actor();
 	void init();
 
-	// void set_scheduler(Scheduler* scheduler) { m_scheduler = scheduler; }
+	void set_name(std::string_view name) { m_name = name; }
 
-	ActorId id() const { return ActorId{.actor_address = m_handle.address()}; }
+	std::string_view name() const { return m_name; }
 
-	std::optional<detail::Envelope> resume();
+	ActorId id() const { return ActorId(this); }
+
+	detail::SchedulerCommand resume();
 
 	Status status() const { return m_status; }
 
 	void set_ready();
 
-	void append_msg(const std::string& msg);
+	void append_msg(std::string msg);
 
 protected:
 	template <typename ActorT, typename... Args>
-	std::unique_ptr<Actor> spawn(Args...);
+	detail::SpawnCommand spawn(Args...);
+	detail::SendCommand send(ActorId receiver, std::string msg);
 
-	detail::Envelope send(ActorId receiver, const std::string& msg);
 	detail::ReceiveAwaiter receive();
 
-	void set_name(const std::string& name) { m_name = name; }
+	void log(std::string_view message);
 
 private:
-	virtual Handle act() = 0;
+	virtual Coroutine act() = 0;
 
-	void log(const std::string& message);
-
-	Handle m_handle{};
+	Coroutine m_handle{};
 	Status m_status{Status::Ready};
 	std::list<std::string> m_message_queue{};
-
-	// Scheduler* m_scheduler{nullptr};
 
 	std::string m_name{"Unknown"};
 };
@@ -110,47 +106,48 @@ namespace detail {
 
 class Promise {
 public:
-	Actor::Handle get_return_object();
+	Actor::Coroutine get_return_object();
 	std::suspend_always initial_suspend();
 	void return_void();
 	void unhandled_exception();
 	std::suspend_always final_suspend() noexcept;
 
-	std::suspend_always yield_value(Envelope envelope)
+	std::suspend_always yield_value(SendCommand cmd)
 	{
-		yielded_envelope = envelope;
+		scheduler_command = cmd;
 		return {};
 	}
 
-	SpawnAwaiter yield_value(std::unique_ptr<Actor> actor)
+	SpawnAwaiter yield_value(SpawnCommand cmd)
 	{
-		yielded_actor = std::move(actor);
-		ActorId id{.actor_address = yielded_actor.get()};
-		return {id};
+		ActorId id{cmd.actor.get()};
+		scheduler_command = std::move(cmd);
+		return SpawnAwaiter{id};
 	}
 
-	std::optional<Envelope> yielded_envelope;
-	std::unique_ptr<Actor> yielded_actor;
+	void reset() { scheduler_command = {}; }
+
+	SchedulerCommand scheduler_command;
 };
 
 } // namespace detail
 
-// template <typename ActorT, typename... Args>
-// ActorId Actor::spawn(Args... args)
-// {
-// 	return m_scheduler->insert_actor(std::make_unique<ActorT>(args...));
-// }
-
 template <typename ActorT, typename... Args>
-std::unique_ptr<Actor> Actor::spawn(Args... args)
+detail::SpawnCommand Actor::spawn(Args... args)
 {
-	return std::make_unique<ActorT>(args...);
+	auto actor = std::make_unique<ActorT>(args...);
+	std::string_view name = detail::get_type_name<ActorT>();
+	actor->set_name(name);
+
+	// log(std::format("Spawning {}", name));
+
+	return detail::SpawnCommand{std::move(actor)};
 }
 
 } // namespace coactor
 
 template <typename... ArgTypes>
-struct std::coroutine_traits<coactor::Actor::Handle, ArgTypes...> {
+struct std::coroutine_traits<coactor::Actor::Coroutine, ArgTypes...> {
 	using promise_type // NOLINT(readability-identifier-naming)
 		= coactor::detail::Promise;
 };

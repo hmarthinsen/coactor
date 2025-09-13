@@ -1,84 +1,94 @@
 #include "coactor/actor.hpp"
 
+#include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
 #include <chrono>
 #include <format>
 #include <iostream>
+#include <variant>
 
 namespace coactor {
 
 Actor::~Actor()
 {
-	log("Destroying");
+	// log("Destroying");
 	m_handle.destroy();
 }
 
 void Actor::init()
 {
-	log("Initializing");
 	m_handle = act();
+	// log("Initializing");
 }
 
 void Actor::set_ready()
 {
-	log("Ready");
+	// log("Ready");
 	m_status = Status::Ready;
 }
 
-std::optional<detail::Envelope> Actor::resume()
+detail::SchedulerCommand Actor::resume()
 {
-	log("Running");
+	// log("Running");
 	m_status = Status::Running;
+
 	auto& promise = m_handle.promise();
-	promise.yielded_envelope = std::nullopt;
+	promise.reset();
+
 	if (!m_handle.done()) {
 		m_handle.resume();
 	}
 
 	if (m_handle.done()) {
-		log("Done");
+		// log("Done");
 		m_status = Status::Done;
-	} else {
-		log("Blocked");
-		m_status = Status::Blocked;
+		return {};
 	}
 
-	return promise.yielded_envelope;
+	if (std::holds_alternative<detail::SpawnCommand>(promise.scheduler_command)
+		|| std::holds_alternative<detail::SendCommand>(
+			promise.scheduler_command
+		)) {
+		return std::move(promise.scheduler_command);
+	}
+
+	// Else, the Actor is waiting for a message.
+	// log("Blocked");
+	m_status = Status::Blocked;
+
+	return std::move(promise.scheduler_command);
 }
 
-void Actor::append_msg(const std::string& msg)
+void Actor::append_msg(std::string msg)
 {
-	m_message_queue.push_back(msg);
+	m_message_queue.emplace_back(msg);
 }
 
-void Actor::log(const std::string& message)
+void Actor::log(std::string_view message)
 {
 	std::cout << std::format(
-		"{} [{}] {}\n",
+		"{} [{} {}] {}\n",
 		std::chrono::system_clock::now(),
+		id(),
 		m_name,
 		message
 	);
 }
 
-detail::Envelope Actor::send(ActorId receiver, const std::string& msg)
+detail::SendCommand Actor::send(ActorId receiver, std::string msg)
 {
-	// log(std::format("Sending \"{}\" to {}", msg, receiver));
-	// m_scheduler->send(receiver, msg);
-
-	return detail::Envelope{receiver, msg};
+	return detail::SendCommand{receiver, std::move(msg)};
 }
 
 detail::ReceiveAwaiter Actor::receive()
 {
-	log("Receiving");
 	return detail::ReceiveAwaiter{m_message_queue};
 }
 
-Actor::Handle detail::Promise::get_return_object()
+Actor::Coroutine detail::Promise::get_return_object()
 {
-	return Actor::Handle::from_promise(*this);
+	return Actor::Coroutine::from_promise(*this);
 }
 
 std::suspend_always detail::Promise::initial_suspend()

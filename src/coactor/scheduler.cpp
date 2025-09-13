@@ -1,16 +1,18 @@
 #include "coactor/scheduler.hpp"
 
 #include "coactor/actor.hpp"
+#include "coactor/detail/utils.hpp"
 
+#include <chrono>
+#include <format>
 #include <iostream>
-#include <mutex>
 #include <utility>
+#include <variant>
 
 namespace coactor {
 
 ActorId Scheduler::insert_actor(std::unique_ptr<Actor> actor)
 {
-	// actor->set_scheduler(this);
 	actor->init();
 
 	const auto id = actor->id();
@@ -24,27 +26,24 @@ ActorId Scheduler::insert_actor(std::unique_ptr<Actor> actor)
 void Scheduler::run()
 {
 	while (true) {
-		{ // Process transfer queue.
-			std::lock_guard<std::mutex> guard{m_transfer_queue_mutex};
-			if (!m_transfer_queue.empty()) {
-				const auto [id, msg] = m_transfer_queue.front();
-				m_transfer_queue.pop_front();
-				send(id, msg);
-				continue;
-			}
-		}
-
 		if (m_ready_queue.empty()) {
-			std::cout << "Ready queue is empty!\n";
+			// log("Ready queue is empty!");
 			break;
 		}
 
 		const ActorId id = m_ready_queue.front();
 		m_ready_queue.pop_front();
 
-		std::optional<detail::Envelope> e = m_actors[id]->resume();
-		if (e) {
-			send(e->receiver, e->msg);
+		detail::SchedulerCommand cmd = m_actors[id]->resume();
+
+		if (std::holds_alternative<detail::SendCommand>(cmd)) {
+			auto send_cmd = std::get<detail::SendCommand>(cmd);
+			send(send_cmd.receiver, send_cmd.msg);
+			m_ready_queue.push_back(id);
+		} else if (std::holds_alternative<detail::SpawnCommand>(cmd)) {
+			auto spawn_cmd = std::move(std::get<detail::SpawnCommand>(cmd));
+			insert_actor(std::move(spawn_cmd.actor));
+			m_ready_queue.push_back(id);
 		}
 
 		if (m_actors[id]->status() == Actor::Status::Done) {
@@ -55,7 +54,8 @@ void Scheduler::run()
 
 void Scheduler::send(ActorId receiver, const std::string& msg)
 {
-	// if (receiver.scheduler_address == this) {
+	// log(std::format("Sending to {}: {}", m_actors[receiver]->name(), msg));
+
 	switch (m_actors[receiver]->status()) {
 	case Actor::Status::Ready:
 	case Actor::Status::Running:
@@ -69,17 +69,15 @@ void Scheduler::send(ActorId receiver, const std::string& msg)
 	case Actor::Status::Done:
 		break;
 	}
-	// } else { // Redirect to correct scheduler.
-	// 	auto target_scheduler
-	// 		= static_cast<Scheduler*>(receiver.scheduler_address);
-	// 	target_scheduler->transfer(receiver, msg);
-	// }
 }
 
-void Scheduler::transfer(ActorId receiver, const std::string& msg)
+void Scheduler::log(std::string_view message)
 {
-	std::lock_guard<std::mutex> guard{m_transfer_queue_mutex};
-	m_transfer_queue.push_back({receiver, msg});
+	std::cout << std::format(
+		"{} [Scheduler] {}\n",
+		std::chrono::system_clock::now(),
+		message
+	);
 }
 
 } // namespace coactor
