@@ -69,7 +69,6 @@ PackConstructorInitializers: NextLine
 QualifierAlignment: Left
 RemoveParentheses: ReturnStatement
 RemoveSemicolon: true
-SeparateDefinitionBlocks: Always
 SpaceBeforeCpp11BracedList: false
 SpacesInContainerLiterals: false
 Standard: c++20

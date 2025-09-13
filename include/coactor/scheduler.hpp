@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coactor/detail/utils.hpp"
+#include "coactor/detail/actor_coro.hpp"
 
 #include <list>
 #include <map>

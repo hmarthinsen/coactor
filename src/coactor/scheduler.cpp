@@ -3,9 +3,7 @@
 #include "coactor/actor.hpp"
 #include "coactor/detail/utils.hpp"
 
-#include <chrono>
 #include <format>
-#include <iostream>
 #include <utility>
 #include <variant>
 
@@ -27,7 +25,7 @@ void Scheduler::run()
 {
 	while (true) {
 		if (m_ready_queue.empty()) {
-			// log("Ready queue is empty!");
+			log("Ready queue is empty!");
 			break;
 		}
 
@@ -54,7 +52,12 @@ void Scheduler::run()
 
 void Scheduler::send(ActorId receiver, const std::string& msg)
 {
-	// log(std::format("Sending to {}: {}", m_actors[receiver]->name(), msg));
+	log(std::format(
+		"Sending to {}:{}: \"{}\"",
+		receiver,
+		m_actors[receiver]->name(),
+		msg
+	));
 
 	switch (m_actors[receiver]->status()) {
 	case Actor::Status::Ready:
@@ -73,11 +76,7 @@ void Scheduler::send(ActorId receiver, const std::string& msg)
 
 void Scheduler::log(std::string_view message)
 {
-	std::cout << std::format(
-		"{} [Scheduler] {}\n",
-		std::chrono::system_clock::now(),
-		message
-	);
+	detail::log("Scheduler", message);
 }
 
 } // namespace coactor

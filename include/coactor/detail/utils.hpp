@@ -1,32 +1,10 @@
 #pragma once
 
-#include <memory>
-#include <string>
 #include <string_view>
-#include <variant>
 
-namespace coactor {
+#include <cstdint>
 
-class Actor;
-
-// TODO: Use an opaque ID, not pointer.
-using ActorId = void*;
-
-namespace detail {
-
-struct SpawnCommand {
-	std::unique_ptr<Actor> actor;
-};
-
-struct SendCommand {
-	ActorId receiver;
-	std::string msg;
-};
-
-struct ReceiveCommand { };
-
-using SchedulerCommand
-	= std::variant<std::monostate, SpawnCommand, SendCommand, ReceiveCommand>;
+namespace coactor::detail {
 
 template <typename T>
 constexpr auto get_type_name() -> std::string_view
@@ -54,6 +32,8 @@ constexpr auto get_type_name() -> std::string_view
 	return function.substr(start, size);
 }
 
-} // namespace detail
+std::uint64_t get_unique_id();
 
-} // namespace coactor
+void log(std::string_view from, std::string_view msg);
+
+} // namespace coactor::detail

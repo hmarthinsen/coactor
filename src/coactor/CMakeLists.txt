@@ -8,5 +8,7 @@ target_sources(
                 ${PROJECT_SOURCE_DIR}/include/coactor/actor.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/coactor.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/scheduler.hpp
-    PRIVATE actor.cpp scheduler.cpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/detail/actor_coro.hpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/detail/utils.hpp
+    PRIVATE actor.cpp scheduler.cpp detail/actor_coro.cpp detail/utils.cpp
 )

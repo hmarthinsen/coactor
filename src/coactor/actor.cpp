@@ -3,45 +3,43 @@
 #include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
-#include <chrono>
 #include <format>
-#include <iostream>
 #include <variant>
 
 namespace coactor {
 
 Actor::~Actor()
 {
-	// log("Destroying");
-	m_handle.destroy();
+	log("Destroyed");
+	m_coro_handle.destroy();
 }
 
 void Actor::init()
 {
-	m_handle = act();
-	// log("Initializing");
+	m_coro_handle = act();
+	log("Created");
 }
 
 void Actor::set_ready()
 {
-	// log("Ready");
+	log("Status Ready");
 	m_status = Status::Ready;
 }
 
 detail::SchedulerCommand Actor::resume()
 {
-	// log("Running");
+	log("Status Running");
 	m_status = Status::Running;
 
-	auto& promise = m_handle.promise();
+	auto& promise = m_coro_handle.promise();
 	promise.reset();
 
-	if (!m_handle.done()) {
-		m_handle.resume();
+	if (!m_coro_handle.done()) {
+		m_coro_handle.resume();
 	}
 
-	if (m_handle.done()) {
-		// log("Done");
+	if (m_coro_handle.done()) {
+		log("Status Done");
 		m_status = Status::Done;
 		return {};
 	}
@@ -54,7 +52,7 @@ detail::SchedulerCommand Actor::resume()
 	}
 
 	// Else, the Actor is waiting for a message.
-	// log("Blocked");
+	log("Status Blocked");
 	m_status = Status::Blocked;
 
 	return std::move(promise.scheduler_command);
@@ -63,17 +61,6 @@ detail::SchedulerCommand Actor::resume()
 void Actor::append_msg(std::string msg)
 {
 	m_message_queue.emplace_back(msg);
-}
-
-void Actor::log(std::string_view message)
-{
-	std::cout << std::format(
-		"{} [{} {}] {}\n",
-		std::chrono::system_clock::now(),
-		id(),
-		m_name,
-		message
-	);
 }
 
 detail::SendCommand Actor::send(ActorId receiver, std::string msg)
@@ -86,18 +73,16 @@ detail::ReceiveAwaiter Actor::receive()
 	return detail::ReceiveAwaiter{m_message_queue};
 }
 
-Actor::Coroutine detail::Promise::get_return_object()
+void Actor::log(std::string_view message)
 {
-	return Actor::Coroutine::from_promise(*this);
+	detail::log(std::format("{}:{}", id(), m_name), message);
 }
 
-std::suspend_always detail::Promise::initial_suspend()
-{
-	return {};
-}
+namespace detail {
 
-void detail::Promise::return_void()
+ActorCoroutine detail::Promise::get_return_object()
 {
+	return ActorCoroutine::from_promise(*this);
 }
 
 void detail::Promise::unhandled_exception()
@@ -105,15 +90,25 @@ void detail::Promise::unhandled_exception()
 	try {
 		std::rethrow_exception(std::current_exception());
 	} catch (const std::exception& e) {
-		std::cout << "Unhandled exception: " << e.what() << '\n';
+		detail::log("System", std::format("Unhandled exception: {}", e.what()));
 	} catch (...) {
-		std::cout << "Unhandled exception: Unknown error\n";
+		detail::log("System", "Unhandled exception: Unknown error");
 	}
 }
 
-std::suspend_always detail::Promise::final_suspend() noexcept
+std::suspend_always Promise::yield_value(SendCommand cmd)
 {
+	scheduler_command = cmd;
 	return {};
 }
+
+SpawnAwaiter Promise::yield_value(SpawnCommand cmd)
+{
+	ActorId id = cmd.actor->id();
+	scheduler_command = std::move(cmd);
+	return SpawnAwaiter{id};
+}
+
+} // namespace detail
 
 } // namespace coactor
