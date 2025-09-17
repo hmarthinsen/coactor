@@ -8,7 +8,7 @@
 
 namespace coactor {
 class Actor;
-using ActorId = std::uint64_t;
+using Address = std::uint64_t;
 } // namespace coactor
 
 namespace coactor::detail {
@@ -18,7 +18,8 @@ struct SpawnCommand {
 };
 
 struct SendCommand {
-	ActorId receiver;
+	Address sender;
+	Address receiver;
 	std::string msg;
 };
 

@@ -15,7 +15,7 @@ private:
 
 class Sender : public coactor::Actor {
 public:
-	Sender(coactor::ActorId receiver) : m_receiver{receiver} { }
+	Sender(coactor::Address receiver) : m_receiver{receiver} { }
 
 private:
 	Coroutine act() override
@@ -25,14 +25,14 @@ private:
 		}
 	}
 
-	coactor::ActorId m_receiver;
+	coactor::Address m_receiver;
 };
 
 class Main : public coactor::Actor {
 private:
 	Coroutine act() override
 	{
-		coactor::ActorId receiver = co_yield spawn<Receiver>();
+		coactor::Address receiver = co_yield spawn<Receiver>();
 		co_yield spawn<Sender>(receiver);
 	}
 };

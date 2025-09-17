@@ -76,7 +76,7 @@ A **scheduler** organizes the execution of actors in a single thread.
 
 ### Runtime
 
-A single **runtime** is constructed in the OS process, and the runtime organizes the schedulers.
+A single **runtime** is constructed in the process, and the runtime organizes the schedulers.
 
 ### Inspector
 
@@ -89,6 +89,8 @@ This means that all the information that the inspector can see must be accessibl
 
 A **coroutine** is a function that can be suspended, and then resumed later.
 A suspended coroutine saves its local variables, and restores them when it is resumed.
+When a coroutine is suspended, it may yield data out to the caller.
+The caller may send data into the coroutine when resuming it.
 
 The implementation relies on coroutines as the basic async building block.
 We can implement actors using coroutines by creating a mechanism for receiving and sending messages between coroutines.
@@ -98,9 +100,7 @@ We can implement actors using coroutines by creating a mechanism for receiving a
 Actors are implemented as coroutines.
 The actor state consists of local variables in the coroutine.
 
-The actor address is the address of the coroutine.
-See [`std::coroutine_handle<Promise>::address()`](https://en.cppreference.com/w/cpp/coroutine/coroutine_handle/address.html).
-NB: This will only work when we are only considering actors on a single machine.
+The actor address is process-unique 64-bit unsigned integer.
 
 An actor has a **status**, which can be **ready**, **running**, **blocked**, or **done**.
 
@@ -128,6 +128,10 @@ The scheduler then chooses which actor to pass control to.
 The actor statuses determine what the scheduler does.
 
 When the actor is running (status *running*), the following can cause control to pass back to the scheduler:
+
+- The actor is finished executing. The status becomes *done*.
+
+- The actor spawns a new actor.
 
 - The actor tries to receive a message.
   - If there is a message in the message queue, execution continues in the actor.

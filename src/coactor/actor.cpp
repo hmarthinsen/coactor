@@ -1,34 +1,47 @@
 #include "coactor/actor.hpp"
 
+#include "coactor/detail/actor_coro.hpp"
 #include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
 #include <format>
-#include <variant>
+#include <string>
 
 namespace coactor {
 
 Actor::~Actor()
 {
-	log("Destroyed");
 	m_coro_handle.destroy();
 }
 
 void Actor::init()
 {
 	m_coro_handle = act();
-	log("Created");
+
+	auto& promise = m_coro_handle.promise();
+	promise.address = m_address;
+	promise.name = m_name;
+
+	m_is_initialized = true;
+}
+
+void Actor::set_name(std::string_view name)
+{
+	m_name = name;
+
+	if (m_is_initialized) {
+		auto& promise = m_coro_handle.promise();
+		promise.name = name;
+	}
 }
 
 void Actor::set_ready()
 {
-	log("Status Ready");
 	m_status = Status::Ready;
 }
 
 detail::SchedulerCommand Actor::resume()
 {
-	log("Status Running");
 	m_status = Status::Running;
 
 	auto& promise = m_coro_handle.promise();
@@ -39,21 +52,11 @@ detail::SchedulerCommand Actor::resume()
 	}
 
 	if (m_coro_handle.done()) {
-		log("Status Done");
+		log(detail::bold("Done"));
 		m_status = Status::Done;
-		return {};
+	} else {
+		m_status = Status::Blocked;
 	}
-
-	if (std::holds_alternative<detail::SpawnCommand>(promise.scheduler_command)
-		|| std::holds_alternative<detail::SendCommand>(
-			promise.scheduler_command
-		)) {
-		return std::move(promise.scheduler_command);
-	}
-
-	// Else, the Actor is waiting for a message.
-	log("Status Blocked");
-	m_status = Status::Blocked;
 
 	return std::move(promise.scheduler_command);
 }
@@ -63,9 +66,14 @@ void Actor::append_msg(std::string msg)
 	m_message_queue.emplace_back(msg);
 }
 
-detail::SendCommand Actor::send(ActorId receiver, std::string msg)
+detail::SendCommand Actor::send(Address receiver, std::string msg)
 {
-	return detail::SendCommand{receiver, std::move(msg)};
+	log(std::format(
+		"Sending to {}: \"{}\"",
+		detail::colorize(std::to_string(receiver), receiver),
+		msg
+	));
+	return detail::SendCommand{address(), receiver, std::move(msg)};
 }
 
 detail::ReceiveAwaiter Actor::receive()
@@ -75,7 +83,7 @@ detail::ReceiveAwaiter Actor::receive()
 
 void Actor::log(std::string_view message)
 {
-	detail::log(std::format("{}:{}", id(), m_name), message);
+	detail::log(std::format("{}", *this), message);
 }
 
 namespace detail {
@@ -90,9 +98,21 @@ void detail::Promise::unhandled_exception()
 	try {
 		std::rethrow_exception(std::current_exception());
 	} catch (const std::exception& e) {
-		detail::log("System", std::format("Unhandled exception: {}", e.what()));
+		detail::log(
+			coactor::detail::colorize(
+				std::format("{}:{}", address, name),
+				address
+			),
+			detail::red(std::format("Unhandled exception: {}", e.what()))
+		);
 	} catch (...) {
-		detail::log("System", "Unhandled exception: Unknown error");
+		detail::log(
+			coactor::detail::colorize(
+				std::format("{}:{}", address, name),
+				address
+			),
+			detail::red("Unhandled exception: Unknown error")
+		);
 	}
 }
 
@@ -104,9 +124,9 @@ std::suspend_always Promise::yield_value(SendCommand cmd)
 
 SpawnAwaiter Promise::yield_value(SpawnCommand cmd)
 {
-	ActorId id = cmd.actor->id();
+	Address address = cmd.actor->address();
 	scheduler_command = std::move(cmd);
-	return SpawnAwaiter{id};
+	return SpawnAwaiter{address};
 }
 
 } // namespace detail

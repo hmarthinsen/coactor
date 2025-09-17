@@ -11,6 +11,7 @@ std::string ReceiveAwaiter::await_resume()
 {
 	std::string msg = m_message_queue.front();
 	m_message_queue.pop_front();
+
 	return msg;
 }
 

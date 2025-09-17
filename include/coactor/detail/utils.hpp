@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <string_view>
 
 #include <cstdint>
@@ -35,5 +36,15 @@ constexpr auto get_type_name() -> std::string_view
 std::uint64_t get_unique_id();
 
 void log(std::string_view from, std::string_view msg);
+
+std::string colorize(std::string_view str, std::uint64_t i);
+std::string red(std::string_view str);
+std::string green(std::string_view str);
+std::string yellow(std::string_view str);
+std::string blue(std::string_view str);
+std::string magenta(std::string_view str);
+std::string cyan(std::string_view str);
+std::string bold(std::string_view str);
+std::string italic(std::string_view str);
 
 } // namespace coactor::detail

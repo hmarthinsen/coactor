@@ -7,6 +7,7 @@
 #include <format>
 #include <list>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -29,10 +30,10 @@ public:
 	void init();
 
 	std::string_view name() const { return m_name; }
-	void set_name(std::string_view name) { m_name = name; }
+	void set_name(std::string_view name);
 
-	ActorId id() const { return m_id; }
-	void set_id(ActorId id) { m_id = id; }
+	Address address() const { return m_address; }
+	void set_address(Address address) { m_address = address; }
 
 	Status status() const { return m_status; }
 	void set_ready();
@@ -44,7 +45,7 @@ public:
 protected:
 	template <typename ActorT, typename... Args>
 	detail::SpawnCommand spawn(Args...);
-	detail::SendCommand send(ActorId receiver, std::string msg);
+	detail::SendCommand send(Address receiver, std::string msg);
 	detail::ReceiveAwaiter receive();
 
 	void log(std::string_view message);
@@ -52,8 +53,13 @@ protected:
 private:
 	virtual Coroutine act() = 0;
 
-	ActorId m_id{0};
+	bool m_is_initialized{false};
+
 	std::string m_name{"Unknown"};
+
+	Address m_address{0};
+	std::set<Address> m_child_addresses{};
+
 	Status m_status{Status::Ready};
 	Coroutine m_coro_handle{};
 	std::list<std::string> m_message_queue{};
@@ -65,11 +71,13 @@ detail::SpawnCommand Actor::spawn(Args... args)
 	const std::string_view actor_type_name = detail::get_type_name<ActorT>();
 
 	auto actor = std::make_unique<ActorT>(args...);
-	ActorId id = detail::get_unique_id();
-	actor->set_id(id);
+	Address address = detail::get_unique_id();
+	actor->set_address(address);
 	actor->set_name(actor_type_name);
 
-	log(std::format("Spawning {}:{}", id, actor_type_name));
+	m_child_addresses.insert(address);
+
+	log(std::format("{} {}", detail::bold("Spawning"), *actor));
 
 	return detail::SpawnCommand{std::move(actor)};
 }
@@ -90,8 +98,27 @@ public:
 	void reset() { scheduler_command = {}; }
 
 	SchedulerCommand scheduler_command;
+	Address address;
+	std::string name;
 };
 
 } // namespace detail
 
 } // namespace coactor
+
+template <typename T>
+struct std::formatter<
+	T,
+	std::enable_if_t<std::is_base_of<coactor::Actor, T>::value, char>>
+	: std::formatter<std::string> {
+	auto format(const T& actor, format_context& ctx) const
+	{
+		return formatter<std::string>::format(
+			coactor::detail::colorize(
+				std::format("{}:{}", actor.address(), actor.name()),
+				actor.address()
+			),
+			ctx
+		);
+	}
+};

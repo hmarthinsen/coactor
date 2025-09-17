@@ -1,64 +1,62 @@
 #include "coactor/scheduler.hpp"
 
 #include "coactor/actor.hpp"
+#include "coactor/detail/actor_coro.hpp"
 #include "coactor/detail/utils.hpp"
 
-#include <format>
 #include <utility>
 #include <variant>
 
 namespace coactor {
 
-ActorId Scheduler::insert_actor(std::unique_ptr<Actor> actor)
+Address Scheduler::insert_actor(std::unique_ptr<Actor> actor)
 {
 	actor->init();
 
-	const auto id = actor->id();
-	m_actors[id] = std::move(actor);
+	const auto address = actor->address();
+	m_actors[address] = std::move(actor);
 
-	m_ready_queue.push_back(id);
+	m_ready_queue.push_back(address);
 
-	return id;
+	return address;
 }
 
 void Scheduler::run()
 {
 	while (true) {
 		if (m_ready_queue.empty()) {
-			log("Ready queue is empty!");
+			log(detail::bold("Ready queue empty"));
 			break;
 		}
 
-		const ActorId id = m_ready_queue.front();
+		const Address active_actor_addr = m_ready_queue.front();
 		m_ready_queue.pop_front();
+		Actor* active_actor = m_actors[active_actor_addr].get();
 
-		detail::SchedulerCommand cmd = m_actors[id]->resume();
+		detail::SchedulerCommand cmd = active_actor->resume();
 
 		if (std::holds_alternative<detail::SendCommand>(cmd)) {
 			auto send_cmd = std::get<detail::SendCommand>(cmd);
 			send(send_cmd.receiver, send_cmd.msg);
-			m_ready_queue.push_back(id);
+
+			active_actor->set_ready();
+			m_ready_queue.push_back(active_actor_addr);
 		} else if (std::holds_alternative<detail::SpawnCommand>(cmd)) {
 			auto spawn_cmd = std::move(std::get<detail::SpawnCommand>(cmd));
 			insert_actor(std::move(spawn_cmd.actor));
-			m_ready_queue.push_back(id);
+
+			active_actor->set_ready();
+			m_ready_queue.push_back(active_actor_addr);
 		}
 
-		if (m_actors[id]->status() == Actor::Status::Done) {
-			m_actors.erase(id);
+		if (active_actor->status() == Actor::Status::Done) {
+			m_actors.erase(active_actor_addr);
 		}
 	}
 }
 
-void Scheduler::send(ActorId receiver, const std::string& msg)
+void Scheduler::send(Address receiver, const std::string& msg)
 {
-	log(std::format(
-		"Sending to {}:{}: \"{}\"",
-		receiver,
-		m_actors[receiver]->name(),
-		msg
-	));
-
 	switch (m_actors[receiver]->status()) {
 	case Actor::Status::Ready:
 	case Actor::Status::Running:

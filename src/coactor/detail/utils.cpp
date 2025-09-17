@@ -32,4 +32,44 @@ void log(
 #endif
 }
 
+std::string colorize(std::string_view str, std::uint64_t i)
+{
+	// Red is reserved for errors.
+	int color_code = i % 5 + 32;
+	return std::format("\033[{}m{}\033[0m", color_code, str);
+}
+
+std::string red(std::string_view str)
+{
+	return std::format("\033[31m{}\033[0m", str);
+}
+std::string green(std::string_view str)
+{
+	return std::format("\033[32m{}\033[0m", str);
+}
+std::string yellow(std::string_view str)
+{
+	return std::format("\033[33m{}\033[0m", str);
+}
+std::string blue(std::string_view str)
+{
+	return std::format("\033[34m{}\033[0m", str);
+}
+std::string magenta(std::string_view str)
+{
+	return std::format("\033[35m{}\033[0m", str);
+}
+std::string cyan(std::string_view str)
+{
+	return std::format("\033[36m{}\033[0m", str);
+}
+std::string bold(std::string_view str)
+{
+	return std::format("\033[1m{}\033[0m", str);
+}
+std::string italic(std::string_view str)
+{
+	return std::format("\033[3m{}\033[0m", str);
+}
+
 } // namespace coactor::detail

@@ -13,17 +13,17 @@ class Actor;
 
 class Scheduler {
 public:
-	ActorId insert_actor(std::unique_ptr<Actor> actor);
+	Address insert_actor(std::unique_ptr<Actor> actor);
 
 	void run();
 
 private:
-	void send(ActorId receiver, const std::string& msg);
+	void send(Address receiver, const std::string& msg);
 
 	void log(std::string_view message);
 
-	std::map<ActorId, std::unique_ptr<Actor>> m_actors;
-	std::list<ActorId> m_ready_queue;
+	std::map<Address, std::unique_ptr<Actor>> m_actors;
+	std::list<Address> m_ready_queue;
 };
 
 } // namespace coactor

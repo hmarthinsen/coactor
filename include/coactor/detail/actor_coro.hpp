@@ -10,7 +10,7 @@ namespace coactor {
 
 class Actor;
 
-using ActorId = std::uint64_t;
+using Address = std::uint64_t;
 
 namespace detail {
 
@@ -34,14 +34,14 @@ private:
 
 class SpawnAwaiter {
 public:
-	SpawnAwaiter(ActorId id) : m_id{id} { }
+	SpawnAwaiter(Address address) : m_address{address} { }
 
 	bool await_ready() { return false; }
 	bool await_suspend(std::coroutine_handle<>) { return true; }
-	ActorId await_resume() { return m_id; }
+	Address await_resume() { return m_address; }
 
 private:
-	ActorId m_id;
+	Address m_address;
 };
 
 } // namespace detail
