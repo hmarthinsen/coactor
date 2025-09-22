@@ -14,6 +14,7 @@
 
 namespace coactor {
 
+// NOT thread-safe.
 class Actor {
 public:
 	enum class Status {

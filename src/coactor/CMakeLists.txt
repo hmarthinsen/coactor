@@ -7,8 +7,14 @@ target_sources(
             FILES
                 ${PROJECT_SOURCE_DIR}/include/coactor/actor.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/coactor.hpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/runtime.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/scheduler.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/detail/actor_coro.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/detail/utils.hpp
-    PRIVATE actor.cpp scheduler.cpp detail/actor_coro.cpp detail/utils.cpp
+    PRIVATE
+        actor.cpp
+        runtime.cpp
+        scheduler.cpp
+        detail/actor_coro.cpp
+        detail/utils.cpp
 )

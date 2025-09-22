@@ -68,11 +68,6 @@ void Actor::append_msg(std::string msg)
 
 detail::SendCommand Actor::send(Address receiver, std::string msg)
 {
-	log(std::format(
-		"Sending to {}: \"{}\"",
-		detail::colorize(std::to_string(receiver), receiver),
-		msg
-	));
 	return detail::SendCommand{address(), receiver, std::move(msg)};
 }
 

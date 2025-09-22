@@ -26,7 +26,7 @@ C++20 actor framework using coroutines.
 @startuml
 
 Runtime *-- Scheduler
-Scheduler *-- Actor
+Runtime *-- Actor
 Actor --> Address
 Actor --> MessageQueue
 MessageQueue *-- Message
@@ -76,7 +76,8 @@ A **scheduler** organizes the execution of actors in a single thread.
 
 ### Runtime
 
-A single **runtime** is constructed in the process, and the runtime organizes the schedulers.
+A single **runtime** is constructed in the process.
+The runtime owns the actors and organizes the schedulers.
 
 ### Inspector
 
@@ -158,3 +159,9 @@ If we have two actors in different schedulers that want to send messages to each
 
 - The simplest solution is to protect each queue with a mutex, blocking access from multiple threads simultaneously.
 - Another solution is to have some sort of lock-free multiple producer, single consumer (MPSC) queue.
+
+### Runtime implementation
+
+The runtime is the object that owns all the actors and schedulers.
+When an actor wants to spawn another actor, it calls a method on the runtime object to spawn the new actor.
+The method inserts the new actor into an appropriate scheduler so that it can begin execution.

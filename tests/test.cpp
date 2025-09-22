@@ -1,7 +1,9 @@
 #include "coactor/actor.hpp"
-#include "coactor/coactor.hpp"
+#include "coactor/runtime.hpp"
 
 #include <string>
+
+using namespace std::chrono_literals;
 
 class Receiver : public coactor::Actor {
 private:
@@ -9,6 +11,7 @@ private:
 	{
 		while (true) {
 			const std::string msg = co_await receive();
+			log(std::format("Received: \"{}\"", msg));
 		}
 	}
 };
@@ -21,7 +24,9 @@ private:
 	Coroutine act() override
 	{
 		for (int i = 1; i <= 10; ++i) {
-			co_yield send(m_receiver, std::to_string(i));
+			const std::string msg = std::to_string(i);
+			log(std::format("Sending to {}: \"{}\"", m_receiver, msg));
+			co_yield send(m_receiver, msg);
 		}
 	}
 
@@ -39,6 +44,10 @@ private:
 
 int main()
 {
-	coactor::run<Main>();
+	coactor::Runtime runtime;
+	runtime.add_schedulers(2);
+	runtime.spawn_actor<Main>();
+	runtime.run();
+
 	return 0;
 }
