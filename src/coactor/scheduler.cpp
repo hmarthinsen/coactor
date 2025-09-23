@@ -13,18 +13,20 @@ namespace coactor {
 
 void Scheduler::insert_actor(std::shared_ptr<Actor> actor)
 {
-	std::lock_guard lock{m_incoming_actors_mutex};
+	std::unique_lock lock{m_incoming_mutex};
 	m_incoming_actors.push_back(std::move(actor));
+	m_has_incoming = true;
 
-	m_incoming_semaphore.release();
+	m_incoming_cv.notify_one();
 }
 
 void Scheduler::send(Address receiver, const std::string& msg)
 {
-	std::lock_guard lock{m_incoming_messages_mutex};
+	std::unique_lock lock{m_incoming_mutex};
 	m_incoming_messages.push_back({receiver, msg});
+	m_has_incoming = true;
 
-	m_incoming_semaphore.release();
+	m_incoming_cv.notify_one();
 }
 
 void Scheduler::run()
@@ -34,8 +36,14 @@ void Scheduler::run()
 		insert_incoming_messages();
 
 		if (m_ready_queue.empty()) {
-			// Wait until an incoming actor or message has arrived.
-			m_incoming_semaphore.acquire();
+			m_runtime->signal_scheduler_blocked();
+
+			wait_until_incoming_or_exit();
+			if (m_shall_exit) {
+				return;
+			}
+
+			m_runtime->signal_scheduler_unblocked();
 			continue;
 		}
 
@@ -66,9 +74,21 @@ void Scheduler::run()
 	}
 }
 
+void Scheduler::exit()
+{
+	{
+		std::unique_lock lock{m_incoming_mutex};
+		m_shall_exit = true;
+	}
+	m_incoming_cv.notify_one();
+}
+
 void Scheduler::insert_incoming_actors()
 {
-	std::lock_guard lock{m_incoming_actors_mutex};
+	std::lock_guard lock{m_incoming_mutex};
+
+	m_has_incoming = false;
+
 	for (const auto& actor : m_incoming_actors) {
 		actor->init();
 
@@ -83,7 +103,9 @@ void Scheduler::insert_incoming_actors()
 
 void Scheduler::insert_incoming_messages()
 {
-	std::lock_guard lock{m_incoming_messages_mutex};
+	std::lock_guard lock{m_incoming_mutex};
+
+	m_has_incoming = false;
 
 	for (const auto& [receiver, msg] : m_incoming_messages) {
 		switch (m_actors[receiver]->status()) {
@@ -102,6 +124,12 @@ void Scheduler::insert_incoming_messages()
 	}
 
 	m_incoming_messages.clear();
+}
+
+void Scheduler::wait_until_incoming_or_exit()
+{
+	std::unique_lock lock{m_incoming_mutex};
+	m_incoming_cv.wait(lock, [this] { return m_has_incoming || m_shall_exit; });
 }
 
 void Scheduler::log(std::string_view message)

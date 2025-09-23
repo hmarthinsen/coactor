@@ -2,10 +2,10 @@
 
 #include "coactor/detail/actor_coro.hpp"
 
+#include <condition_variable>
 #include <list>
 #include <map>
 #include <memory>
-#include <semaphore>
 #include <string>
 
 namespace coactor {
@@ -23,12 +23,17 @@ public:
 	// Thread-safe.
 	void send(Address receiver, const std::string& msg);
 
-	// Only to be run once, in its own thread.
+	// Only to be run once, in its own thread. Blocks until done.
 	void run();
+
+	// Called by Runtime::run() when the scheduler is to exit.
+	void exit();
 
 private:
 	void insert_incoming_actors();
 	void insert_incoming_messages();
+
+	void wait_until_incoming_or_exit();
 
 	void log(std::string_view message);
 
@@ -36,12 +41,11 @@ private:
 
 	std::map<Address, std::shared_ptr<Actor>> m_actors;
 
-	std::binary_semaphore m_incoming_semaphore{0};
-
-	std::mutex m_incoming_actors_mutex{};
+	std::mutex m_incoming_mutex;
+	std::condition_variable m_incoming_cv;
+	bool m_has_incoming{false};
+	bool m_shall_exit{false};
 	std::list<std::shared_ptr<Actor>> m_incoming_actors;
-
-	std::mutex m_incoming_messages_mutex{};
 	std::list<std::pair<Address, std::string>> m_incoming_messages;
 
 	std::list<Address> m_ready_queue;

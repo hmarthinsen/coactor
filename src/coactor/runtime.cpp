@@ -4,6 +4,7 @@
 #include "coactor/scheduler.hpp"
 
 #include <memory>
+#include <mutex>
 
 namespace coactor {
 
@@ -40,6 +41,8 @@ void Runtime::add_schedulers(int num_schedulers)
 	for (int i = 0; i < num_schedulers; ++i) {
 		m_schedulers.push_back(std::make_unique<Scheduler>(this));
 	}
+
+	m_num_schedulers_unblocked = num_schedulers;
 }
 
 void Runtime::run()
@@ -48,36 +51,42 @@ void Runtime::run()
 		m_scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
 	}
 
-	for (auto& thread : m_scheduler_threads) {
-		thread.join();
+	wait_until_schedulers_blocked();
+
+	for (auto& scheduler : m_schedulers) {
+		scheduler->exit();
 	}
+
+	detail::log("Runtime", "Done");
 }
 
 void Runtime::send(Address receiver, const std::string& msg)
 {
-	{
-		std::lock_guard lock{m_schedulers_mutex};
-		Scheduler* scheduler = m_address_to_scheduler.at(receiver);
-		scheduler->send(receiver, msg);
-	}
+	std::lock_guard lock{m_schedulers_mutex};
+	Scheduler* scheduler = m_address_to_scheduler.at(receiver);
+	scheduler->send(receiver, msg);
 }
 
-// void Runtime::log(
-// 	[[maybe_unused]] Address from,
-// 	[[maybe_unused]] std::string_view msg
-// )
-// {
-// #ifndef NDEBUG
-// 	static const auto time_start{std::chrono::system_clock::now()};
-// 	std::cout << std::format(
-// 		"{} [{}] - {}\n",
-// 		std::chrono::duration_cast<std::chrono::microseconds>(
-// 			std::chrono::system_clock::now() - time_start
-// 		),
-// 		from,
-// 		msg
-// 	);
-// #endif
-// }
+void Runtime::signal_scheduler_blocked()
+{
+	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
+	m_num_schedulers_unblocked--;
+
+	m_num_schedulers_unblocked_cv.notify_one();
+}
+
+void Runtime::signal_scheduler_unblocked()
+{
+	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
+	m_num_schedulers_unblocked++;
+}
+
+void Runtime::wait_until_schedulers_blocked()
+{
+	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
+	m_num_schedulers_unblocked_cv.wait(lock, [this] {
+		return m_num_schedulers_unblocked == 0;
+	});
+}
 
 } // namespace coactor

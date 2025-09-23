@@ -45,9 +45,13 @@ private:
 int main()
 {
 	coactor::Runtime runtime;
-	runtime.add_schedulers(2);
+	runtime.add_schedulers(4);
 	runtime.spawn_actor<Main>();
 	runtime.run();
+
+	// TODO: Want to write this:
+	// coactor::Runtime runtime{4}; // Default arg = num cores.
+	// runtime.run<Main>(args...);
 
 	return 0;
 }

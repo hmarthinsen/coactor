@@ -3,6 +3,7 @@
 #include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
+#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -23,7 +24,7 @@ class Runtime {
 public:
 	void add_schedulers(int num_schedulers);
 
-	// Only one thread may call run().
+	// Only the main thread may call run(). Blocks until done.
 	void run();
 
 	template <typename ActorT, typename... Args>
@@ -33,9 +34,13 @@ public:
 
 	void send(Address receiver, const std::string& msg);
 
-	// void log(Address from, std::string_view msg);
+	void signal_scheduler_blocked();
+	void signal_scheduler_unblocked();
 
 private:
+	// To be called in the main thread.
+	void wait_until_schedulers_blocked();
+
 	std::mutex m_actors_mutex{};
 	std::map<Address, std::shared_ptr<Actor>> m_actors{};
 
@@ -44,6 +49,10 @@ private:
 	std::vector<std::unique_ptr<Scheduler>> m_schedulers{};
 	std::map<Address, Scheduler*> m_address_to_scheduler{};
 	int m_next_scheduler{0}; // Index of scheduler to use on next spawn.
+
+	std::mutex m_num_schedulers_unblocked_mutex{};
+	std::condition_variable m_num_schedulers_unblocked_cv{};
+	int m_num_schedulers_unblocked{};
 };
 
 template <typename ActorT, typename... Args>
