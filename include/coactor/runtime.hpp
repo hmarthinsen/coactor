@@ -78,6 +78,10 @@ int Runtime::run(Args... args)
 		scheduler->exit();
 	}
 
+	for (auto& thread : m_scheduler_threads) {
+		thread.join();
+	}
+
 	detail::log("Runtime", "Done");
 	return EXIT_SUCCESS;
 }
