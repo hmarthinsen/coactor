@@ -4,12 +4,14 @@
 #include "coactor/detail/scheduler_cmd.hpp"
 #include "coactor/detail/utils.hpp"
 
+#include <coroutine>
 #include <format>
 #include <list>
 #include <memory>
 #include <set>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace coactor {

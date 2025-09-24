@@ -5,8 +5,17 @@
 
 #include <memory>
 #include <mutex>
+#include <thread>
+#include <utility>
 
 namespace coactor {
+
+Runtime::Runtime(unsigned int num_schedulers) : m_num_schedulers{num_schedulers}
+{
+	if (num_schedulers == 0) {
+		m_num_schedulers = std::thread::hardware_concurrency();
+	}
+}
 
 Address Runtime::insert_actor(std::shared_ptr<Actor> actor)
 {
@@ -35,29 +44,14 @@ void Runtime::erase_actor(Address address)
 	m_actors.erase(address);
 }
 
-void Runtime::add_schedulers(int num_schedulers)
+void Runtime::add_schedulers()
 {
 	std::lock_guard lock{m_schedulers_mutex};
-	for (int i = 0; i < num_schedulers; ++i) {
+	for (unsigned int i = 0; i < m_num_schedulers; ++i) {
 		m_schedulers.push_back(std::make_unique<Scheduler>(this));
 	}
 
-	m_num_schedulers_unblocked = num_schedulers;
-}
-
-void Runtime::run()
-{
-	for (auto& scheduler : m_schedulers) {
-		m_scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
-	}
-
-	wait_until_schedulers_blocked();
-
-	for (auto& scheduler : m_schedulers) {
-		scheduler->exit();
-	}
-
-	detail::log("Runtime", "Done");
+	m_num_schedulers_unblocked = m_num_schedulers;
 }
 
 void Runtime::send(Address receiver, const std::string& msg)

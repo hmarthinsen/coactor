@@ -7,12 +7,14 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
 
 #include <cstdint>
+#include <cstdlib>
 
 namespace coactor {
 
@@ -22,10 +24,11 @@ using Address = std::uint64_t;
 // Thread-safe. Its methods will be called by several schedulers simultaneously.
 class Runtime {
 public:
-	void add_schedulers(int num_schedulers);
+	Runtime(unsigned int num_schedulers = 0);
 
 	// Only the main thread may call run(). Blocks until done.
-	void run();
+	template <typename ActorT, typename... Args>
+	int run(Args... args);
 
 	template <typename ActorT, typename... Args>
 	Address spawn_actor(Args... args);
@@ -38,8 +41,12 @@ public:
 	void signal_scheduler_unblocked();
 
 private:
+	void add_schedulers();
+
 	// To be called in the main thread.
 	void wait_until_schedulers_blocked();
+
+	unsigned int m_num_schedulers{0};
 
 	std::mutex m_actors_mutex{};
 	std::map<Address, std::shared_ptr<Actor>> m_actors{};
@@ -54,6 +61,26 @@ private:
 	std::condition_variable m_num_schedulers_unblocked_cv{};
 	int m_num_schedulers_unblocked{};
 };
+
+template <typename ActorT, typename... Args>
+int Runtime::run(Args... args)
+{
+	add_schedulers();
+	spawn_actor<ActorT>(args...);
+
+	for (auto& scheduler : m_schedulers) {
+		m_scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
+	}
+
+	wait_until_schedulers_blocked();
+
+	for (auto& scheduler : m_schedulers) {
+		scheduler->exit();
+	}
+
+	detail::log("Runtime", "Done");
+	return EXIT_SUCCESS;
+}
 
 template <typename ActorT, typename... Args>
 Address Runtime::spawn_actor(Args... args)
