@@ -1,10 +1,12 @@
 #include "coactor/runtime.hpp"
 
 #include "coactor/actor.hpp"
+#include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <utility>
 
@@ -40,8 +42,14 @@ Address Runtime::insert_actor(std::shared_ptr<Actor> actor)
 
 void Runtime::erase_actor(Address address)
 {
-	std::lock_guard lock{m_actors_mutex};
-	m_actors.erase(address);
+	{
+		std::lock_guard lock{m_actors_mutex};
+		m_actors.erase(address);
+	}
+	{
+		std::lock_guard lock{m_schedulers_mutex};
+		m_address_to_scheduler.erase(address);
+	}
 }
 
 void Runtime::add_schedulers()
@@ -57,6 +65,16 @@ void Runtime::add_schedulers()
 void Runtime::send(Address receiver, const std::string& msg)
 {
 	std::lock_guard lock{m_schedulers_mutex};
+	if (!m_address_to_scheduler.contains(receiver)) {
+		detail::log(
+			"Runtime",
+			detail::red(
+				"Warning: Attempted to send to nonexistent actor: "
+				+ std::to_string(receiver)
+			)
+		);
+		return;
+	}
 	Scheduler* scheduler = m_address_to_scheduler.at(receiver);
 	scheduler->send(receiver, msg);
 }

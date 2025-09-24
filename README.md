@@ -2,6 +2,11 @@
 
 C++20 actor framework using coroutines.
 
+## Next
+
+- Timeout when receiving messages.
+- One mutex per scheduler.
+
 ## Requirements
 
 - Actor system inspired by Erlang, but using C++20 coroutines.
@@ -10,7 +15,7 @@ C++20 actor framework using coroutines.
 - An actor should know its own address and its children's addresses.
 - The scheduling is cooperative multitasking.
 - There is one scheduler per thread.
-- The system will start with a certain number of schedulers (parameter?).
+- The system will start with a certain number of schedulers (parameter).
 - There is no limit to how many actors may be assigned to a scheduler.
 - Actor state is isolated from other actors.
 - Need to have timeout functionality when waiting for messages.
@@ -48,7 +53,7 @@ MessageQueue *-- Message
 
 #### Actor addresses
 
-TODO
+Implemented as a 64-bit atomic counter.
 
 #### Sending messages
 

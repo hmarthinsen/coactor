@@ -51,6 +51,8 @@ private:
 	std::mutex m_actors_mutex{};
 	std::map<Address, std::shared_ptr<Actor>> m_actors{};
 
+	// TODO: Each scheduler should have its own mutex, so that sending of
+	// messages doesn't block the whole runtime.
 	std::mutex m_schedulers_mutex{};
 	std::vector<std::jthread> m_scheduler_threads{};
 	std::vector<std::unique_ptr<Scheduler>> m_schedulers{};
