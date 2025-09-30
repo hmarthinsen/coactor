@@ -2,11 +2,8 @@
 
 #include "coactor/detail/actor_coro.hpp"
 #include "coactor/detail/utils.hpp"
-#include "coactor/scheduler.hpp"
 
-#include <format>
 #include <string>
-#include <utility>
 
 namespace coactor {
 
@@ -15,25 +12,17 @@ Actor::~Actor()
 	m_coro_handle.destroy();
 }
 
-void Actor::init()
+void Actor::init(Runtime* runtime, Address address, std::string_view name)
 {
+	m_runtime = runtime;
+	m_address = address;
+	m_name = name;
+
 	m_coro_handle = act();
 
 	auto& promise = m_coro_handle.promise();
 	promise.address = m_address;
 	promise.name = m_name;
-
-	m_is_initialized = true;
-}
-
-void Actor::set_name(std::string_view name)
-{
-	m_name = name;
-
-	if (m_is_initialized) {
-		auto& promise = m_coro_handle.promise();
-		promise.name = name;
-	}
 }
 
 void Actor::set_ready()
@@ -41,35 +30,29 @@ void Actor::set_ready()
 	m_status = Status::Ready;
 }
 
-detail::SchedulerCommand Actor::resume()
+void Actor::resume()
 {
 	m_status = Status::Running;
-
-	auto& promise = m_coro_handle.promise();
-	promise.reset();
 
 	if (!m_coro_handle.done()) {
 		m_coro_handle.resume();
 	}
 
 	if (m_coro_handle.done()) {
-		log(detail::bold("Done"));
 		m_status = Status::Done;
 	} else {
 		m_status = Status::Blocked;
 	}
-
-	return std::move(promise.scheduler_command);
 }
 
 void Actor::append_msg(std::string msg)
 {
-	m_message_queue.emplace_back(msg);
+	m_message_queue.emplace_back(std::move(msg));
 }
 
-detail::SendCommand Actor::send(Address receiver, std::string msg)
+void Actor::send(Address receiver, const std::string& msg)
 {
-	return detail::SendCommand{address(), receiver, std::move(msg)};
+	m_runtime->send(receiver, msg);
 }
 
 detail::ReceiveAwaiter Actor::receive()
@@ -110,19 +93,6 @@ void detail::Promise::unhandled_exception()
 			detail::red("Unhandled exception: Unknown error")
 		);
 	}
-}
-
-std::suspend_always Promise::yield_value(SendCommand cmd)
-{
-	scheduler_command = cmd;
-	return {};
-}
-
-SpawnAwaiter Promise::yield_value(SpawnCommand cmd)
-{
-	Address address = cmd.actor->address();
-	scheduler_command = std::move(cmd);
-	return SpawnAwaiter{address};
 }
 
 } // namespace detail

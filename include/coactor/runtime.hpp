@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include <cstdint>
 #include <cstdlib>
 
 namespace coactor {
@@ -32,7 +31,6 @@ public:
 
 	template <typename ActorT, typename... Args>
 	Address spawn_actor(Args... args);
-	Address insert_actor(std::shared_ptr<Actor>);
 	void erase_actor(Address);
 
 	void send(Address receiver, const std::string& msg);
@@ -45,6 +43,8 @@ private:
 
 	// To be called in the main thread.
 	void wait_until_schedulers_blocked();
+
+	Address insert_actor(std::shared_ptr<Actor>, std::string_view name);
 
 	unsigned int m_num_schedulers{0};
 
@@ -84,21 +84,16 @@ int Runtime::run(Args... args)
 		thread.join();
 	}
 
-	detail::log("Runtime", "Done");
 	return EXIT_SUCCESS;
 }
 
 template <typename ActorT, typename... Args>
 Address Runtime::spawn_actor(Args... args)
 {
-	const std::string_view actor_type_name = detail::get_type_name<ActorT>();
 	auto actor = std::make_shared<ActorT>(args...);
-	actor->set_name(actor_type_name);
+	const std::string_view name = detail::get_type_name<ActorT>();
 
-	Address address = detail::get_unique_id();
-	actor->set_address(address);
-
-	return insert_actor(std::move(actor));
+	return insert_actor(std::move(actor), name);
 }
 
 } // namespace coactor

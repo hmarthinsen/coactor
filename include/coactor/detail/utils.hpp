@@ -1,5 +1,7 @@
 #pragma once
 
+// IWYU pragma: private
+
 #include <string>
 #include <string_view>
 

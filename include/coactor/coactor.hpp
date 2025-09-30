@@ -1,7 +1,7 @@
 #pragma once
 
 #include "coactor/actor.hpp" // IWYU pragma: export
-#include "coactor/runtime.hpp"
+#include "coactor/runtime.hpp" // IWYU pragma: export
 
 namespace coactor {
 

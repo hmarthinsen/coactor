@@ -1,13 +1,10 @@
 #include "coactor/scheduler.hpp"
 
 #include "coactor/actor.hpp"
-#include "coactor/detail/actor_coro.hpp"
-#include "coactor/detail/utils.hpp"
 #include "coactor/runtime.hpp"
 
 #include <mutex>
 #include <utility>
-#include <variant>
 
 namespace coactor {
 
@@ -20,7 +17,7 @@ void Scheduler::insert_actor(std::shared_ptr<Actor> actor)
 	m_incoming_cv.notify_one();
 }
 
-void Scheduler::send(Address receiver, const std::string& msg)
+void Scheduler::insert_message(Address receiver, const std::string& msg)
 {
 	std::unique_lock lock{m_incoming_mutex};
 	m_incoming_messages.push_back({receiver, msg});
@@ -51,21 +48,7 @@ void Scheduler::run()
 		m_ready_queue.pop_front();
 		Actor* active_actor = m_actors[active_actor_addr].get();
 
-		detail::SchedulerCommand cmd = active_actor->resume();
-
-		if (std::holds_alternative<detail::SendCommand>(cmd)) {
-			auto send_cmd = std::get<detail::SendCommand>(cmd);
-			m_runtime->send(send_cmd.receiver, send_cmd.msg);
-
-			active_actor->set_ready();
-			m_ready_queue.push_back(active_actor_addr);
-		} else if (std::holds_alternative<detail::SpawnCommand>(cmd)) {
-			auto spawn_cmd = std::move(std::get<detail::SpawnCommand>(cmd));
-			m_runtime->insert_actor(std::move(spawn_cmd.actor));
-
-			active_actor->set_ready();
-			m_ready_queue.push_back(active_actor_addr);
-		}
+		active_actor->resume();
 
 		if (active_actor->status() == Actor::Status::Done) {
 			m_runtime->erase_actor(active_actor_addr);
@@ -90,8 +73,6 @@ void Scheduler::insert_incoming_actors()
 	m_has_incoming = false;
 
 	for (const auto& actor : m_incoming_actors) {
-		actor->init();
-
 		const auto address = actor->address();
 		m_actors[address] = std::move(actor);
 
@@ -130,11 +111,6 @@ void Scheduler::wait_until_incoming_or_exit()
 {
 	std::unique_lock lock{m_incoming_mutex};
 	m_incoming_cv.wait(lock, [this] { return m_has_incoming || m_shall_exit; });
-}
-
-void Scheduler::log(std::string_view message)
-{
-	detail::log("Scheduler", message);
 }
 
 } // namespace coactor

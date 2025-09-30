@@ -11,6 +11,8 @@ private:
 			const std::string msg = co_await receive();
 			log(std::format("Received: \"{}\"", msg));
 		}
+
+		co_return;
 	}
 };
 
@@ -24,8 +26,10 @@ private:
 		for (int i = 1; i <= 10; ++i) {
 			const std::string msg = std::to_string(i);
 			log(std::format("Sending to {}: \"{}\"", m_receiver, msg));
-			co_yield send(m_receiver, msg);
+			send(m_receiver, msg);
 		}
+
+		co_return;
 	}
 
 	coactor::Address m_receiver;
@@ -35,8 +39,13 @@ class Main : public coactor::Actor {
 private:
 	Coroutine act() override
 	{
-		coactor::Address receiver = co_yield spawn<Receiver>();
-		co_yield spawn<Sender>(receiver);
+		const coactor::Address receiver = spawn<Receiver>();
+		log(std::format("Spawned {}", receiver));
+
+		const coactor::Address sender = spawn<Sender>(receiver);
+		log(std::format("Spawned {}", sender));
+
+		co_return;
 	}
 };
 

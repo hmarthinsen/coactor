@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -19,9 +20,11 @@ Runtime::Runtime(unsigned int num_schedulers) : m_num_schedulers{num_schedulers}
 	}
 }
 
-Address Runtime::insert_actor(std::shared_ptr<Actor> actor)
+Address
+Runtime::insert_actor(std::shared_ptr<Actor> actor, std::string_view name)
 {
-	Address address = actor->address();
+	const Address address = detail::get_unique_id();
+	actor->init(this, address, name);
 
 	{
 		std::lock_guard lock{m_schedulers_mutex};
@@ -76,7 +79,7 @@ void Runtime::send(Address receiver, const std::string& msg)
 		return;
 	}
 	Scheduler* scheduler = m_address_to_scheduler.at(receiver);
-	scheduler->send(receiver, msg);
+	scheduler->insert_message(receiver, msg);
 }
 
 void Runtime::signal_scheduler_blocked()

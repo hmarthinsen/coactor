@@ -1,16 +1,12 @@
 #pragma once
 
+// IWYU pragma: private
+
 #include <coroutine>
 #include <list>
 #include <string>
 
-#include <cstdint>
-
 namespace coactor {
-
-class Actor;
-
-using Address = std::uint64_t;
 
 namespace detail {
 
@@ -30,18 +26,6 @@ public:
 
 private:
 	std::list<std::string>& m_message_queue;
-};
-
-class SpawnAwaiter {
-public:
-	SpawnAwaiter(Address address) : m_address{address} { }
-
-	bool await_ready() { return false; }
-	bool await_suspend(std::coroutine_handle<>) { return true; }
-	Address await_resume() { return m_address; }
-
-private:
-	Address m_address;
 };
 
 } // namespace detail
