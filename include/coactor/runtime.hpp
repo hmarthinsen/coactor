@@ -35,28 +35,30 @@ public:
 
 	void send(Address receiver, const std::string& msg);
 
-	void signal_scheduler_blocked();
-	void signal_scheduler_unblocked();
+	// When a scheduler is blocked, it calls this method.
+	void notify_scheduler_blocked();
+	// When a scheduler is unblocked, it calls this method.
+	void notify_scheduler_unblocked();
+
+	Actor* get_actor(Address) const;
 
 private:
+	Address insert_actor(std::shared_ptr<Actor>, std::string_view name);
+
 	void add_schedulers();
 
-	// To be called in the main thread.
 	void wait_until_schedulers_blocked();
-
-	Address insert_actor(std::shared_ptr<Actor>, std::string_view name);
 
 	unsigned int m_num_schedulers{0};
 
-	std::mutex m_actors_mutex{};
+	mutable std::mutex m_actors_mutex{};
 	std::map<Address, std::shared_ptr<Actor>> m_actors{};
 
 	// TODO: Each scheduler should have its own mutex, so that sending of
 	// messages doesn't block the whole runtime.
 	std::mutex m_schedulers_mutex{};
-	std::vector<std::jthread> m_scheduler_threads{};
 	std::vector<std::unique_ptr<Scheduler>> m_schedulers{};
-	std::map<Address, Scheduler*> m_address_to_scheduler{};
+
 	int m_next_scheduler{0}; // Index of scheduler to use on next spawn.
 
 	std::mutex m_num_schedulers_unblocked_mutex{};
@@ -70,8 +72,9 @@ int Runtime::run(Args... args)
 	add_schedulers();
 	spawn_actor<ActorT>(args...);
 
+	std::vector<std::jthread> scheduler_threads{};
 	for (auto& scheduler : m_schedulers) {
-		m_scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
+		scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
 	}
 
 	wait_until_schedulers_blocked();
@@ -80,7 +83,7 @@ int Runtime::run(Args... args)
 		scheduler->exit();
 	}
 
-	for (auto& thread : m_scheduler_threads) {
+	for (auto& thread : scheduler_threads) {
 		thread.join();
 	}
 

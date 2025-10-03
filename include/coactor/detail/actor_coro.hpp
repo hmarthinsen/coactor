@@ -4,6 +4,7 @@
 
 #include <coroutine>
 #include <list>
+#include <mutex>
 #include <string>
 
 namespace coactor {
@@ -15,8 +16,12 @@ using ActorCoroutine = std::coroutine_handle<Promise>;
 
 class ReceiveAwaiter {
 public:
-	ReceiveAwaiter(std::list<std::string>& message_queue)
+	ReceiveAwaiter(
+		std::list<std::string>& message_queue,
+		std::mutex& message_queue_mutex
+	)
 		: m_message_queue{message_queue}
+		, m_message_queue_mutex{message_queue_mutex}
 	{
 	}
 
@@ -26,6 +31,7 @@ public:
 
 private:
 	std::list<std::string>& m_message_queue;
+	std::mutex& m_message_queue_mutex;
 };
 
 } // namespace detail

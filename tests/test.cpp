@@ -3,12 +3,14 @@
 #include <format>
 #include <string>
 
+using namespace std::chrono_literals;
+
 class Receiver : public coactor::Actor {
 private:
 	Coroutine act() override
 	{
 		while (true) {
-			const std::string msg = co_await receive();
+			const std::string msg = co_await receive(250ms, "Timeout!");
 			log(std::format("Received: \"{}\"", msg));
 		}
 
@@ -23,7 +25,7 @@ public:
 private:
 	Coroutine act() override
 	{
-		for (int i = 1; i <= 10; ++i) {
+		for (int i = 1; i <= 2; ++i) {
 			const std::string msg = std::to_string(i);
 			log(std::format("Sending to {}: \"{}\"", m_receiver, msg));
 			send(m_receiver, msg);

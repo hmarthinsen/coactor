@@ -3,56 +3,106 @@
 #include "coactor/actor.hpp"
 #include "coactor/runtime.hpp"
 
+#include <chrono>
 #include <mutex>
-#include <utility>
 
 namespace coactor {
 
 void Scheduler::insert_actor(std::shared_ptr<Actor> actor)
 {
-	std::unique_lock lock{m_incoming_mutex};
-	m_incoming_actors.push_back(std::move(actor));
-	m_has_incoming = true;
+	const Address address = actor->address();
+	auto set_ready = [this, address] {
+		// Remove any registered timeout.
+		if (m_timeouts_reverse.contains(address)) {
+			auto timeout = m_timeouts_reverse[address];
+			m_timeouts.erase(timeout);
+			m_timeouts_reverse.erase(address);
+		}
 
-	m_incoming_cv.notify_one();
-}
+		{
+			std::lock_guard lock{m_ready_queue_mutex};
+			m_ready_queue.push_back(address);
+		}
 
-void Scheduler::insert_message(Address receiver, const std::string& msg)
-{
-	std::unique_lock lock{m_incoming_mutex};
-	m_incoming_messages.push_back({receiver, msg});
-	m_has_incoming = true;
+		std::unique_lock lock{m_ready_mutex};
+		m_is_ready = true;
+		m_ready_cv.notify_one();
+	};
 
-	m_incoming_cv.notify_one();
+	actor->register_ready_callback(set_ready);
+
+	set_ready();
 }
 
 void Scheduler::run()
 {
 	while (true) {
-		insert_incoming_actors();
-		insert_incoming_messages();
-
-		if (m_ready_queue.empty()) {
-			m_runtime->signal_scheduler_blocked();
-
-			wait_until_incoming_or_exit();
-			if (m_shall_exit) {
-				return;
+		// Handle timeouts:
+		const auto now = std::chrono::steady_clock::now();
+		for (auto item = m_timeouts.begin(); item != m_timeouts.end();) {
+			const auto& [timeout_point, envelope] = *item;
+			if (now < timeout_point) {
+				// No timeout
+				break;
 			}
 
-			m_runtime->signal_scheduler_unblocked();
-			continue;
+			const auto& [address, timeout_msg] = envelope;
+			m_runtime->send(address, timeout_msg);
+
+			item = m_timeouts.erase(item);
+			m_timeouts_reverse.erase(address);
 		}
 
-		const Address active_actor_addr = m_ready_queue.front();
-		m_ready_queue.pop_front();
-		Actor* active_actor = m_actors[active_actor_addr].get();
+		// Wait until an actor is ready:
+		Address active_actor_addr;
+		{
+			bool is_ready_queue_empty;
+			{
+				std::lock_guard lock{m_ready_queue_mutex};
+				is_ready_queue_empty = m_ready_queue.empty();
+			}
+			if (is_ready_queue_empty) {
+				{
+					std::unique_lock lock{m_ready_mutex};
+					m_is_ready = false;
+				}
 
+				if (m_timeouts.empty()) {
+					m_runtime->notify_scheduler_blocked();
+					wait_until_ready_or_exit();
+					m_runtime->notify_scheduler_unblocked();
+				} else {
+					wait_until_ready_or_exit(m_timeouts.begin()->first);
+				}
+
+				std::unique_lock lock{m_ready_mutex};
+				if (m_shall_exit) {
+					return;
+				}
+			}
+
+			std::lock_guard lock{m_ready_queue_mutex};
+			active_actor_addr = m_ready_queue.front();
+			m_ready_queue.pop_front();
+		}
+
+		Actor* active_actor = m_runtime->get_actor(active_actor_addr);
 		active_actor->resume();
 
 		if (active_actor->status() == Actor::Status::Done) {
 			m_runtime->erase_actor(active_actor_addr);
-			m_actors.erase(active_actor_addr);
+			continue;
+		}
+
+		auto timeout_point = active_actor->timeout_point();
+		const auto timeout_msg = active_actor->timeout_msg();
+		if (timeout_point) {
+			// FIXME: Hack: Nudge timeout_point until it is unique.
+			while (m_timeouts.contains(*timeout_point)) {
+				(*timeout_point) += std::chrono::steady_clock::duration::min();
+			}
+			m_timeouts[*timeout_point] = {active_actor_addr, timeout_msg};
+			m_timeouts_reverse[active_actor_addr] = *timeout_point;
 		}
 	}
 }
@@ -60,57 +110,37 @@ void Scheduler::run()
 void Scheduler::exit()
 {
 	{
-		std::unique_lock lock{m_incoming_mutex};
+		std::unique_lock lock{m_ready_mutex};
 		m_shall_exit = true;
 	}
-	m_incoming_cv.notify_one();
+	m_ready_cv.notify_one();
 }
 
-void Scheduler::insert_incoming_actors()
+void Scheduler::wait_until_ready_or_exit(
+	std::optional<std::chrono::time_point<std::chrono::steady_clock>>
+		timeout_point
+)
 {
-	std::lock_guard lock{m_incoming_mutex};
+	const auto pred = [this] { return m_is_ready || m_shall_exit; };
 
-	m_has_incoming = false;
-
-	for (const auto& actor : m_incoming_actors) {
-		const auto address = actor->address();
-		m_actors[address] = std::move(actor);
-
-		m_ready_queue.push_back(address);
-	}
-
-	m_incoming_actors.clear();
-}
-
-void Scheduler::insert_incoming_messages()
-{
-	std::lock_guard lock{m_incoming_mutex};
-
-	m_has_incoming = false;
-
-	for (const auto& [receiver, msg] : m_incoming_messages) {
-		switch (m_actors[receiver]->status()) {
-		case Actor::Status::Ready:
-		case Actor::Status::Running:
-			m_actors[receiver]->append_msg(msg);
-			break;
-		case Actor::Status::Blocked:
-			m_actors[receiver]->append_msg(msg);
-			m_actors[receiver]->set_ready();
-			m_ready_queue.push_back(receiver);
-			break;
-		case Actor::Status::Done:
-			break;
+	if (timeout_point) {
+		bool is_timeout;
+		{
+			std::unique_lock lock{m_ready_mutex};
+			is_timeout = !m_ready_cv.wait_until(lock, *timeout_point, pred);
 		}
+		if (is_timeout) {
+			const auto& [address, timeout_msg] = m_timeouts[*timeout_point];
+
+			m_runtime->send(address, timeout_msg);
+
+			m_timeouts.erase(*timeout_point);
+			m_timeouts_reverse.erase(address);
+		}
+	} else {
+		std::unique_lock lock{m_ready_mutex};
+		m_ready_cv.wait(lock, pred);
 	}
-
-	m_incoming_messages.clear();
-}
-
-void Scheduler::wait_until_incoming_or_exit()
-{
-	std::unique_lock lock{m_incoming_mutex};
-	m_incoming_cv.wait(lock, [this] { return m_has_incoming || m_shall_exit; });
 }
 
 } // namespace coactor

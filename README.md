@@ -133,21 +133,13 @@ The scheduler then chooses which actor to pass control to.
 
 The actor statuses determine what the scheduler does.
 
-When the actor is running (status *running*), the following can cause control to pass back to the scheduler:
+When an actor is running (status *running*), the following can cause control to pass back to the scheduler:
 
 - The actor is finished executing. The status becomes *done*.
-
-- The actor spawns a new actor.
 
 - The actor tries to receive a message.
   - If there is a message in the message queue, execution continues in the actor.
   - If there are no messages in the message queue, the status becomes *blocked*, the actor coroutine is suspended and control passes to the scheduler.
-
-When actor A sends a message to actor B, the following will happen:
-
-- If actor B has status *done*, nothing happens.
-- If actor B has status *ready* or *running*, the message is placed in B's message queue.
-- If actor B has status *blocked*, the message is placed in B's message queue and B's status becomes *ready*.
 
 ### Inspector implementation
 
@@ -170,3 +162,17 @@ If we have two actors in different schedulers that want to send messages to each
 The runtime is the object that owns all the actors and schedulers.
 When an actor wants to spawn another actor, it calls a method on the runtime object to spawn the new actor.
 The method inserts the new actor into an appropriate scheduler so that it can begin execution.
+
+The runtime can perform the following tasks:
+
+- Spawn a new actor.
+- Erase an actor.
+- Send a message to an actor.
+
+When an actor want to spawn an actor or send a message, it calls methods on the runtime to do this.
+
+When actor A sends a message to actor B, the following will happen:
+
+- If actor B has status *done*, nothing happens.
+- If actor B has status *ready* or *running*, the message is placed in B's message queue.
+- If actor B has status *blocked*, the message is placed in B's message queue and B's status becomes *ready*.

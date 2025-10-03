@@ -3,6 +3,8 @@
 #include "coactor/detail/actor_coro.hpp"
 #include "coactor/detail/utils.hpp"
 
+#include <chrono>
+#include <mutex>
 #include <string>
 
 namespace coactor {
@@ -25,16 +27,24 @@ void Actor::init(Runtime* runtime, Address address, std::string_view name)
 	promise.name = m_name;
 }
 
-void Actor::set_ready()
+std::optional<std::chrono::time_point<std::chrono::steady_clock>>
+Actor::timeout_point() const
 {
-	m_status = Status::Ready;
+	auto& promise = m_coro_handle.promise();
+	return promise.timeout_point;
+}
+
+std::string Actor::timeout_msg() const
+{
+	auto& promise = m_coro_handle.promise();
+	return promise.timeout_msg;
 }
 
 void Actor::resume()
 {
-	m_status = Status::Running;
-
 	if (!m_coro_handle.done()) {
+		m_status = Status::Running;
+		m_coro_handle.promise().reset_timeout();
 		m_coro_handle.resume();
 	}
 
@@ -47,7 +57,20 @@ void Actor::resume()
 
 void Actor::append_msg(std::string msg)
 {
-	m_message_queue.emplace_back(std::move(msg));
+	// FIXME: Status mutex?
+	if (m_status == Status::Done) {
+		return;
+	}
+
+	{
+		std::lock_guard lock{m_message_queue_mutex};
+		m_message_queue.emplace_back(std::move(msg));
+	}
+
+	if (m_status == Status::Blocked) {
+		m_status = Status::Ready;
+		m_ready_callback();
+	}
 }
 
 void Actor::send(Address receiver, const std::string& msg)
@@ -55,9 +78,17 @@ void Actor::send(Address receiver, const std::string& msg)
 	m_runtime->send(receiver, msg);
 }
 
-detail::ReceiveAwaiter Actor::receive()
+detail::ReceiveAwaiter Actor::receive(
+	std::optional<std::chrono::milliseconds> timeout,
+	const std::string& timeout_msg
+)
 {
-	return detail::ReceiveAwaiter{m_message_queue};
+	if (timeout.has_value()) {
+		detail::Promise& promise = m_coro_handle.promise();
+		promise.timeout_point = std::chrono::steady_clock::now() + *timeout;
+		promise.timeout_msg = timeout_msg;
+	}
+	return detail::ReceiveAwaiter{m_message_queue, m_message_queue_mutex};
 }
 
 void Actor::log(std::string_view message)

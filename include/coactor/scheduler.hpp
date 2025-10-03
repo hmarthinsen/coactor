@@ -4,8 +4,7 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <string>
-#include <utility>
+#include <optional>
 
 namespace coactor {
 
@@ -19,10 +18,8 @@ class Scheduler {
 public:
 	Scheduler(Runtime* runtime) : m_runtime{runtime} { }
 
-	// Thread-safe.
+	// Thread-safe. Used by the runtime.
 	void insert_actor(std::shared_ptr<Actor> actor);
-	// Thread-safe.
-	void insert_message(Address receiver, const std::string& msg);
 
 	// Only to be run once, in its own thread. Blocks until done.
 	void run();
@@ -31,22 +28,26 @@ public:
 	void exit();
 
 private:
-	void insert_incoming_actors();
-	void insert_incoming_messages();
-
-	void wait_until_incoming_or_exit();
+	void wait_until_ready_or_exit(
+		std::optional<std::chrono::time_point<std::chrono::steady_clock>>
+			timeout_point
+		= std::nullopt
+	);
 
 	Runtime* m_runtime;
 
-	std::map<Address, std::shared_ptr<Actor>> m_actors;
-
-	std::mutex m_incoming_mutex;
-	std::condition_variable m_incoming_cv;
-	bool m_has_incoming{false};
+	std::mutex m_ready_mutex;
+	std::condition_variable m_ready_cv;
+	bool m_is_ready{false};
 	bool m_shall_exit{false};
-	std::list<std::shared_ptr<Actor>> m_incoming_actors;
-	std::list<std::pair<Address, std::string>> m_incoming_messages;
+	std::map<
+		std::chrono::time_point<std::chrono::steady_clock>,
+		std::pair<Address, std::string>>
+		m_timeouts;
+	std::map<Address, std::chrono::time_point<std::chrono::steady_clock>>
+		m_timeouts_reverse;
 
+	std::mutex m_ready_queue_mutex;
 	std::list<Address> m_ready_queue;
 };
 
