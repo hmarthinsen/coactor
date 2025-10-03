@@ -28,6 +28,9 @@ public:
 	void exit();
 
 private:
+	bool is_ready_queue_empty() const;
+	Address pop_ready_queue();
+
 	void wait_until_ready_or_exit(
 		std::optional<std::chrono::time_point<std::chrono::steady_clock>>
 			timeout_point
@@ -47,7 +50,7 @@ private:
 	std::map<Address, std::chrono::time_point<std::chrono::steady_clock>>
 		m_timeouts_reverse;
 
-	std::mutex m_ready_queue_mutex;
+	mutable std::mutex m_ready_queue_mutex;
 	std::list<Address> m_ready_queue;
 };
 

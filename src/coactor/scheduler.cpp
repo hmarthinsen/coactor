@@ -11,9 +11,10 @@ namespace coactor {
 void Scheduler::insert_actor(std::shared_ptr<Actor> actor)
 {
 	const Address address = actor->address();
+
 	auto set_ready = [this, address] {
-		// Remove any registered timeout.
 		if (m_timeouts_reverse.contains(address)) {
+			// Remove registered timeout.
 			auto timeout = m_timeouts_reverse[address];
 			m_timeouts.erase(timeout);
 			m_timeouts_reverse.erase(address);
@@ -37,6 +38,46 @@ void Scheduler::insert_actor(std::shared_ptr<Actor> actor)
 void Scheduler::run()
 {
 	while (true) {
+		// Wait until an actor is ready or exit:
+		if (is_ready_queue_empty()) {
+			{
+				std::unique_lock lock{m_ready_mutex};
+				m_is_ready = false;
+			}
+
+			if (m_timeouts.empty()) {
+				m_runtime->notify_scheduler_blocked();
+				wait_until_ready_or_exit();
+				m_runtime->notify_scheduler_unblocked();
+			} else {
+				wait_until_ready_or_exit(m_timeouts.begin()->first);
+			}
+
+			std::unique_lock lock{m_ready_mutex};
+			if (m_shall_exit) {
+				return;
+			}
+		}
+
+		Address address = pop_ready_queue();
+		Actor* actor = m_runtime->get_actor(address);
+		actor->resume();
+
+		if (actor->status() == Actor::Status::Done) {
+			m_runtime->erase_actor(address);
+			continue;
+		}
+
+		// Register timeout if there is one:
+		if (auto timeout_point = actor->timeout_point()) {
+			// FIXME: Hack: Nudge timeout_point until it is unique.
+			while (m_timeouts.contains(*timeout_point)) {
+				(*timeout_point) += std::chrono::steady_clock::duration::min();
+			}
+			m_timeouts[*timeout_point] = {address, actor->timeout_msg()};
+			m_timeouts_reverse[address] = *timeout_point;
+		}
+
 		// Handle timeouts:
 		const auto now = std::chrono::steady_clock::now();
 		for (auto item = m_timeouts.begin(); item != m_timeouts.end();) {
@@ -52,58 +93,6 @@ void Scheduler::run()
 			item = m_timeouts.erase(item);
 			m_timeouts_reverse.erase(address);
 		}
-
-		// Wait until an actor is ready:
-		Address active_actor_addr;
-		{
-			bool is_ready_queue_empty;
-			{
-				std::lock_guard lock{m_ready_queue_mutex};
-				is_ready_queue_empty = m_ready_queue.empty();
-			}
-			if (is_ready_queue_empty) {
-				{
-					std::unique_lock lock{m_ready_mutex};
-					m_is_ready = false;
-				}
-
-				if (m_timeouts.empty()) {
-					m_runtime->notify_scheduler_blocked();
-					wait_until_ready_or_exit();
-					m_runtime->notify_scheduler_unblocked();
-				} else {
-					wait_until_ready_or_exit(m_timeouts.begin()->first);
-				}
-
-				std::unique_lock lock{m_ready_mutex};
-				if (m_shall_exit) {
-					return;
-				}
-			}
-
-			std::lock_guard lock{m_ready_queue_mutex};
-			active_actor_addr = m_ready_queue.front();
-			m_ready_queue.pop_front();
-		}
-
-		Actor* active_actor = m_runtime->get_actor(active_actor_addr);
-		active_actor->resume();
-
-		if (active_actor->status() == Actor::Status::Done) {
-			m_runtime->erase_actor(active_actor_addr);
-			continue;
-		}
-
-		auto timeout_point = active_actor->timeout_point();
-		const auto timeout_msg = active_actor->timeout_msg();
-		if (timeout_point) {
-			// FIXME: Hack: Nudge timeout_point until it is unique.
-			while (m_timeouts.contains(*timeout_point)) {
-				(*timeout_point) += std::chrono::steady_clock::duration::min();
-			}
-			m_timeouts[*timeout_point] = {active_actor_addr, timeout_msg};
-			m_timeouts_reverse[active_actor_addr] = *timeout_point;
-		}
 	}
 }
 
@@ -114,6 +103,21 @@ void Scheduler::exit()
 		m_shall_exit = true;
 	}
 	m_ready_cv.notify_one();
+}
+
+bool Scheduler::is_ready_queue_empty() const
+{
+	std::lock_guard lock{m_ready_queue_mutex};
+	return m_ready_queue.empty();
+}
+
+Address Scheduler::pop_ready_queue()
+{
+	std::lock_guard lock{m_ready_queue_mutex};
+	Address address = m_ready_queue.front();
+	m_ready_queue.pop_front();
+
+	return address;
 }
 
 void Scheduler::wait_until_ready_or_exit(
