@@ -78,6 +78,11 @@ void Actor::send(Address receiver, const std::string& msg)
 	m_runtime->send(receiver, msg);
 }
 
+void Actor::send(const std::string& receiver_name, const std::string& msg)
+{
+	m_runtime->send(receiver_name, msg);
+}
+
 detail::ReceiveAwaiter Actor::receive(
 	std::optional<std::chrono::milliseconds> timeout,
 	const std::string& timeout_msg

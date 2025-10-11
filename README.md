@@ -4,7 +4,12 @@ C++20 actor framework using coroutines.
 
 ## Next
 
-- Timeout when receiving messages.
+- Support running coroutines as subroutines in `Actor::act()`, so that we don't
+  have to put the whole actor in a single method.
+- Implement message format other than raw `std::string`.
+- Connect to external functions in two ways:
+  - Synchronous, i.e. functions that block until done.
+  - Asynchronous, i.e. functions that call a callback when done.
 - One mutex per scheduler.
 
 ## Requirements

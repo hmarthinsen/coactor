@@ -9,12 +9,14 @@ target_sources(
                 ${PROJECT_SOURCE_DIR}/include/coactor/coactor.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/runtime.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/scheduler.hpp
+                ${PROJECT_SOURCE_DIR}/include/coactor/stdio.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/detail/actor_coro.hpp
                 ${PROJECT_SOURCE_DIR}/include/coactor/detail/utils.hpp
     PRIVATE
         actor.cpp
         runtime.cpp
         scheduler.cpp
+        stdio.cpp
         detail/actor_coro.cpp
         detail/utils.cpp
 )

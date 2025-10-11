@@ -10,8 +10,12 @@ private:
 	Coroutine act() override
 	{
 		while (true) {
-			const std::string msg = co_await receive(250ms, "Timeout!");
-			log(std::format("Received: \"{}\"", msg));
+			const std::string msg = co_await receive();
+			if (msg == "q") {
+				break;
+			}
+
+			send("StdIo", std::format("out Received {}\n", msg));
 		}
 
 		co_return;
@@ -25,10 +29,14 @@ public:
 private:
 	Coroutine act() override
 	{
-		for (int i = 1; i <= 2; ++i) {
-			const std::string msg = std::to_string(i);
-			log(std::format("Sending to {}: \"{}\"", m_receiver, msg));
+		while (true) {
+			send("StdIo", std::format("in {} q to quit>", address()));
+			const std::string msg = co_await receive();
 			send(m_receiver, msg);
+
+			if (msg == "q") {
+				break;
+			}
 		}
 
 		co_return;
@@ -42,10 +50,7 @@ private:
 	Coroutine act() override
 	{
 		const coactor::Address receiver = spawn<Receiver>();
-		log(std::format("Spawned {}", receiver));
-
-		const coactor::Address sender = spawn<Sender>(receiver);
-		log(std::format("Spawned {}", sender));
+		spawn<Sender>(receiver);
 
 		co_return;
 	}

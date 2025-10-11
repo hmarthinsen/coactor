@@ -46,9 +46,7 @@ void Scheduler::run()
 			}
 
 			if (m_timeouts.empty()) {
-				m_runtime->notify_scheduler_blocked();
 				wait_until_ready_or_exit();
-				m_runtime->notify_scheduler_unblocked();
 			} else {
 				wait_until_ready_or_exit(m_timeouts.begin()->first);
 			}

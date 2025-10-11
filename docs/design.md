@@ -99,3 +99,56 @@ If the message queue is empty and a timeout T with message M is set, the followi
 | ------------- | ------ |
 | message queue | Y      |
 | status        | Y      |
+
+## Inspector
+
+The Inspector is a debugger CLI for Coactor.
+Execution can be halted and various data can be inspected.
+The program can then be stepped, i.e. run one iteration of a scheduler `run` loop.
+
+FIXME: What about timeouts?
+
+### Commands
+
+- `h`/`help`: Show a summary of the commands.
+- `a`/`actors`: Show a list of all actor, with addresses, names and statuses.
+
+  ```text
+  inspector> info actors
+  1 Main Done
+  2 Receiver Blocked
+  3 Sender Ready
+  ```
+
+- `t`/`tree`: Show actors as a tree (who spawned whom).
+
+  ```text
+  1 Main
+  ├── 2 Sender
+  └── 3 Receiver
+  ```
+
+- `s`/`schedulers`: Show a list of all schedulers, with statuses.
+
+  ```text
+  1 Blocked
+  2 Blocked
+  3 Ready
+  4 Ready
+  ```
+
+- `rS`/ `ready S`: Show the ready queue for scheduler S.
+
+  ```text
+  3 Sender
+  2 Receiver
+  ```
+
+- `mX`/`messages X`: Show the message queue for the actor with address X.
+
+  ```text
+  "Message 1"
+  "Message 2"
+  ```
+
+- `nS`/`next S`: Run one iteration of scheduler S.

@@ -3,6 +3,7 @@
 #include "coactor/actor.hpp"
 #include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
+#include "coactor/stdio.hpp"
 
 #include <memory>
 #include <mutex>
@@ -17,6 +18,22 @@ Runtime::Runtime(unsigned int num_schedulers) : m_num_schedulers{num_schedulers}
 	if (num_schedulers == 0) {
 		m_num_schedulers = std::thread::hardware_concurrency();
 	}
+
+	// Add the StdIo Actor in its own Scheduler:
+
+	auto stdio_actor = std::make_shared<StdIo>();
+	const std::string stdio_name{"StdIo"};
+	const Address stdio_addr = detail::get_unique_id();
+	stdio_actor->init(this, stdio_addr, stdio_name);
+
+	{
+		std::lock_guard lock{m_actors_mutex};
+		m_actors[stdio_addr] = stdio_actor;
+		m_name_to_addr[stdio_name] = stdio_addr;
+	}
+
+	m_stdio_scheduler = std::make_unique<Scheduler>(this);
+	m_stdio_scheduler->insert_actor(stdio_actor);
 }
 
 void Runtime::erase_actor(Address address)
@@ -24,6 +41,12 @@ void Runtime::erase_actor(Address address)
 	{
 		std::lock_guard lock{m_actors_mutex};
 		m_actors.erase(address);
+		std::erase_if(m_name_to_addr, [address](const auto& item) {
+			const Address addr = item.second;
+			return addr == address;
+		});
+
+		m_actors_done_cv.notify_one();
 	}
 }
 
@@ -47,24 +70,38 @@ void Runtime::send(Address receiver_addr, const std::string& msg)
 	receiver->append_msg(msg);
 }
 
-void Runtime::notify_scheduler_blocked()
+void Runtime::send(const std::string& receiver_name, const std::string& msg)
 {
-	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
-	m_num_schedulers_unblocked--;
+	Address receiver_addr;
+	{
+		std::lock_guard lock{m_actors_mutex};
 
-	m_num_schedulers_unblocked_cv.notify_one();
-}
+		if (!m_name_to_addr.contains(receiver_name)) {
+			detail::log(
+				"Runtime",
+				detail::red(
+					"Warning: Attempted to send to nonexistent actor name: "
+					+ receiver_name
+				)
+			);
+			return;
+		}
+		receiver_addr = m_name_to_addr.at(receiver_name);
+	}
 
-void Runtime::notify_scheduler_unblocked()
-{
-	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
-	m_num_schedulers_unblocked++;
+	send(receiver_addr, msg);
 }
 
 Actor* Runtime::get_actor(Address address) const
 {
 	std::lock_guard lock{m_actors_mutex};
 	return m_actors.at(address).get();
+}
+
+void Runtime::register_actor_name(Address address, const std::string& name)
+{
+	std::lock_guard lock{m_actors_mutex};
+	m_name_to_addr[name] = address;
 }
 
 Address
@@ -95,15 +132,13 @@ void Runtime::add_schedulers()
 	for (unsigned int i = 0; i < m_num_schedulers; ++i) {
 		m_schedulers.push_back(std::make_unique<Scheduler>(this));
 	}
-
-	m_num_schedulers_unblocked = m_num_schedulers;
 }
 
-void Runtime::wait_until_schedulers_blocked()
+void Runtime::wait_until_actors_done()
 {
-	std::unique_lock lock{m_num_schedulers_unblocked_mutex};
-	m_num_schedulers_unblocked_cv.wait(lock, [this] {
-		return m_num_schedulers_unblocked == 0;
+	std::unique_lock lock{m_actors_mutex};
+	m_actors_done_cv.wait(lock, [this] {
+		return m_actors.size() == 1; // Only StdIo left.
 	});
 }
 

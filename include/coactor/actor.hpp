@@ -57,6 +57,7 @@ protected:
 	template <typename ActorT, typename... Args>
 	Address spawn(Args...);
 	void send(Address receiver, const std::string& msg);
+	void send(const std::string& receiver_name, const std::string& msg);
 	detail::ReceiveAwaiter receive(
 		std::optional<std::chrono::milliseconds> timeout = std::nullopt,
 		const std::string& timeout_msg = ""

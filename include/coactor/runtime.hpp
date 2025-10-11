@@ -3,7 +3,6 @@
 #include "coactor/detail/utils.hpp"
 #include "coactor/scheduler.hpp"
 
-#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -34,36 +33,33 @@ public:
 	void erase_actor(Address);
 
 	void send(Address receiver, const std::string& msg);
-
-	// When a scheduler is blocked, it calls this method.
-	void notify_scheduler_blocked();
-	// When a scheduler is unblocked, it calls this method.
-	void notify_scheduler_unblocked();
+	void send(const std::string& receiver_name, const std::string& msg);
 
 	Actor* get_actor(Address) const;
+
+	void register_actor_name(Address, const std::string& name);
 
 private:
 	Address insert_actor(std::shared_ptr<Actor>, std::string_view name);
 
 	void add_schedulers();
 
-	void wait_until_schedulers_blocked();
+	void wait_until_actors_done();
 
 	unsigned int m_num_schedulers{0};
 
 	mutable std::mutex m_actors_mutex{};
 	std::map<Address, std::shared_ptr<Actor>> m_actors{};
+	std::map<std::string, Address> m_name_to_addr{};
+	std::condition_variable m_actors_done_cv{};
 
 	// TODO: Each scheduler should have its own mutex, so that sending of
 	// messages doesn't block the whole runtime.
 	std::mutex m_schedulers_mutex{};
 	std::vector<std::unique_ptr<Scheduler>> m_schedulers{};
+	std::unique_ptr<Scheduler> m_stdio_scheduler{}; // For I/O only.
 
 	int m_next_scheduler{0}; // Index of scheduler to use on next spawn.
-
-	std::mutex m_num_schedulers_unblocked_mutex{};
-	std::condition_variable m_num_schedulers_unblocked_cv{};
-	int m_num_schedulers_unblocked{};
 };
 
 template <typename ActorT, typename... Args>
@@ -72,20 +68,26 @@ int Runtime::run(Args... args)
 	add_schedulers();
 	spawn_actor<ActorT>(args...);
 
+	std::jthread stdio_scheduler_thread{[this] { m_stdio_scheduler->run(); }};
+
 	std::vector<std::jthread> scheduler_threads{};
 	for (auto& scheduler : m_schedulers) {
 		scheduler_threads.emplace_back([&scheduler] { scheduler->run(); });
 	}
 
-	wait_until_schedulers_blocked();
+	wait_until_actors_done();
 
 	for (auto& scheduler : m_schedulers) {
 		scheduler->exit();
 	}
 
+	m_stdio_scheduler->exit();
+
 	for (auto& thread : scheduler_threads) {
 		thread.join();
 	}
+
+	stdio_scheduler_thread.join();
 
 	return EXIT_SUCCESS;
 }
